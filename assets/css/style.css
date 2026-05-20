@@ -1,0 +1,193 @@
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700&display=swap');
+
+:root {
+    --primary: #3b82f6;
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --text: #0f172a;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.10);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Vazirmatn', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+}
+
+.page-header {
+    height: 72px;
+    background: linear-gradient(135deg, #eff6ff, #ffffff);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    box-shadow: var(--shadow-soft);
+    position: relative;
+    z-index: 1001;
+}
+
+.header-content h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+}
+
+#map {
+    width: 100%;
+    height: calc(100vh - 72px);
+}
+
+body.sidebar-open .page-header { 
+    padding-right: 410px; 
+}
+body.sidebar-open .header-content {
+     transform: translateX(-24px); 
+}
+
+.offcanvas {
+    border: none !important;
+    box-shadow: var(--shadow-soft) !important;
+    background: rgba(255, 255, 255, 0.92) !important;
+    backdrop-filter: blur(12px);
+}
+
+.offcanvas.offcanvas-end {
+    right: 0 !important;
+    left: auto !important;
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(.4,0,.2,1) !important;
+}
+
+.offcanvas.offcanvas-end.show {
+    transform: translateX(0);
+}
+
+.offcanvas-header {
+    padding: 20px 20px 10px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.offcanvas-title {
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.offcanvas-body {
+    padding: 24px;
+}
+
+.header-search {
+    width: 300px;
+    max-width: 100%;
+}
+
+.header-search .form-control,
+.header-search .btn {
+    height: 38px;
+}
+.btn-primary{
+    background-color: #3b414a;
+    border-color: #3b414a;
+}
+.header-search .form-control {
+    border-radius: 10px 0 0 10px;
+}
+
+.header-search .btn {
+    border-radius: 0 10px 10px 0;
+}
+
+@media (max-width: 768px) {
+    .header-content {
+        flex-wrap: wrap;
+    }
+
+    .header-search {
+        width: 100%;
+    }
+}
+
+
+.place-image {
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+    border-radius: 12px;
+}
+
+.place-content {
+    padding: 18px;
+}
+
+.place-desc {
+    color: #334155;
+    font-size: 14px;
+    line-height: 2;
+}
+
+.place-label, .road-label {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #475569;
+    font-weight: 600;
+    font-size: 13px;
+    font-family: 'Vazirmatn';
+    padding: 0;
+}
+
+.leaflet-control-zoom {
+    border: none !important;
+    box-shadow: var(--shadow-soft) !important;
+    border-radius: 14px !important;
+}
+
+.custom-marker {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.marker-pin {
+    width: 30px;
+    height: 30px;
+    border-radius: 50% 50% 50% 0;
+    position: absolute;
+    transform: rotate(-45deg);
+    border: 2px solid #fff;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+
+.marker-pin::after {
+    content: '';
+    width: 10px;
+    height: 10px;
+    background: #fff;
+    position: absolute;
+    border-radius: 50%;
+    top: 34%;
+    left: 30%;
+}
+
+.type-1 .marker-pin { background: #e53935; }
+.type-2 .marker-pin { background: #43a047; }
+.type-3 .marker-pin { background: #1e88e5; }
+.type-4 .marker-pin { background: #fdd835; } 
+.type-5 .marker-pin { background: #8e24aa; }
+
+@media (max-width: 768px) {
+    .offcanvas.offcanvas-end {
+        width: 100% !important;
+    }
+    body.sidebar-open .page-header {
+        padding-right: 0;
+    }
+}
