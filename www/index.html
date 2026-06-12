@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <title>نقشه یادمان شهداء</title>
+    <link rel="stylesheet" href="assets/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="assets/css/bootstrap.rtl.min.css" />
+    <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+
+<body>
+
+    <div id="map"></div>
+
+    <!-- دکمه باز کردن سایدبار در موبایل (اختیاری) -->
+    <button class="btn btn-primary d-md-none sidebar-toggle" type="button" data-bs-toggle="offcanvas"
+        data-bs-target="#infoSidebar">
+        🔍
+    </button>
+
+    <!-- ساختار اصلی سایدبار -->
+    <div class="offcanvas offcanvas-end show" data-bs-backdrop="false" data-bs-scroll="true" tabindex="-1" id="infoSidebar">
+        <div class="offcanvas-header border-bottom">
+            <h4 class="offcanvas-title">پنل مدیریت نقشه</h4>
+            <button type="button" class="btn-close text-reset d-md-none" data-bs-dismiss="offcanvas"></button>
+        </div>
+
+        <div class="offcanvas-body">
+            <div class="search-section">
+
+                <label class="sidebar-label p-2">جستجوی یادمان</label>
+
+                <div class="search-wrapper">
+
+                    <input type="text" id="searchInput" class="search-input" placeholder="نام شهر یا مکان">
+
+                    <button id="searchButton" class="search-btn">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 
+                            6.5 6.5 0 109.5 16a6.47 6.47 0 004.23-1.57l.27.28v.79
+                            L20 21.5 21.5 20l-6-6zM9.5 14A4.5 4.5 0 119.5 5a4.5 
+                            4.5 0 010 9z" />
+                        </svg>
+                    </button>
+
+                </div>
+                <div id="searchResults" class="search-results"></div>
+
+            </div>
+
+
+            <div class="filter-section mt-4">
+
+                <label class="sidebar-label p-2">وضعیت ساخت</label>
+
+                <select id="statusFilterDropdown" class="status-dropdown">
+                    <option value="all">همه موارد</option>
+                    <option value="تکمیل">تکمیل شده</option>
+                    <option value="در دست ساخت">در دست ساخت</option>
+                    <option value="ساخته نشده">ساخته نشده</option>
+                </select>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/leaflet/leaflet.js"></script>
+    <script src="assets/js/bootstrap.bundle.min.js"></script>
+    <script src="adminarea.js"></script>
+    <script src="road.js"></script>
+    <script src="places_khorasan.js"></script>
+    <script src="points.js"></script>
+    <script src="assets/js/main.js"></script>
+</body>
+
+</html>

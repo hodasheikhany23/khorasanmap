@@ -1,0 +1,474 @@
+:root {
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --text: #0f172a;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.10);
+}
+
+* {
+    box-sizing: border-box;
+}
+@font-face {
+    font-family: 'IRANSans';
+    src: url('assets/fonts/IRANSansX-RegularD4.woff2');
+}
+html, body {
+    margin: 0;
+    padding: 0;
+    font-family: 'IRANSans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    direction: rtl;
+}
+
+.page-header {
+    height: 72px;
+    background: linear-gradient(135deg, #eff6ff, #ffffff);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    box-shadow: var(--shadow-soft);
+    position: relative;
+    z-index: 1001;
+}
+
+.header-content h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+}
+
+#map {
+    width: 100%;
+    height: calc(100vh - 72px);
+} 
+
+body.sidebar-open .page-header { 
+    padding-right: 410px; 
+}
+body.sidebar-open .header-content {
+     transform: translateX(-24px); 
+}
+
+.offcanvas {
+    border: none !important;
+    box-shadow: var(--shadow-soft) !important;
+    background: rgba(255, 255, 255, 0.92) !important;
+    backdrop-filter: blur(12px);
+}
+
+.offcanvas.offcanvas-end {
+    right: 0 !important;
+    left: auto !important;
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(.4,0,.2,1) !important;
+}
+
+.offcanvas.offcanvas-end.show {
+    transform: translateX(0);
+}
+
+.offcanvas-header {
+    background: #2f855a !important;
+    padding: 20px 20px 10px;
+    color: white;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.offcanvas-title {
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.offcanvas-body {
+    padding: 24px;
+}
+
+
+.place-label, .road-label {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #475569;
+    font-weight: 600;
+    font-size: 13px;
+    font-family: 'IRANSans', Tahoma, sans-serif !important;
+    padding: 0;
+    direction: rtl;
+}
+
+.leaflet-control-zoom {
+    border: none !important;
+    box-shadow: var(--shadow-soft) !important;
+    border-radius: 14px !important;
+}
+
+
+.custom-leaflet-popup .leaflet-popup-content-wrapper {
+    padding: 0;
+    overflow: hidden;
+    border-radius: 25px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+}
+.custom-leaflet-popup .leaflet-popup-content {
+    margin: 0;
+    width: 340px !important;
+}
+.custom-leaflet-popup .leaflet-popup-tip-container { display: none; }
+.custom-leaflet-popup .leaflet-popup-close-button { display: none; }
+
+.modern-card {
+    background: #fff;
+    direction: rtl;
+    font-family: 'IRANSans', sans-serif;
+}
+
+.card-header-img {
+    height: 180px;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+    border-bottom: 4px solid #fff;
+}
+
+.close-card-btn {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    background: rgba(255,255,255,0.9);
+    border: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 20px;
+    font-weight: bold;
+    color: #333;
+}
+
+.card-body {
+    padding: 20px;
+}
+
+.card-title {
+    text-align: center;
+    color: #1a4d2e; /* سبز تیره مشابه تصویر */
+    font-size: 1.2rem;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
+.info-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.info-item {
+    display: flex;
+    justify-content: flex-end; /* چیدمان راست به چپ */
+    align-items: center;
+    padding: 0px 5px;
+    border-bottom: 1px solid #eee;
+    gap: 15px;
+}
+
+.info-item.no-border { border-bottom: none; }
+
+.info-label {
+    flex-grow: 1;
+    text-align: right;
+    color: #444;
+    font-size: 0.9rem;
+}
+
+.ltr-text {
+    direction: ltr;
+    display: inline-block;
+    font-family: 'IRANSans', sans-serif; /* یا هر فونت عددی مناسب */
+    font-size: 0.85rem;
+    color: #555;
+    text-align: left;
+    width: 100%;
+}
+
+.info-icon svg {
+    width: 20px;
+    height: 20px;
+    fill: #2d6a4f; /* رنگ سبز مشابه عکس */
+}
+
+.info-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* فونت و چیدمان */
+.info-label {
+    flex-grow: 1;
+    text-align: right;
+    color: #444;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.info-label b {
+    color: #222;
+    font-weight: 500;
+}
+
+.card-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: #1a4d2e;
+    font-size: 18px;
+    margin-top: 5px;
+    margin-bottom: 25px;
+}
+
+.card-title span {
+    border-bottom: 2px solid #8ba88e33;
+    padding-bottom: 5px;
+}
+
+/* افکت لبه‌های کارت */
+.custom-leaflet-popup .leaflet-popup-content-wrapper {
+    border-radius: 30px !important;
+    padding: 0 !important;
+}
+
+/* ظرف کلی مارکر */
+.marker-container {
+    position: relative;
+    width: 32px;
+    height: 42px;
+}
+
+/* پین اصلی با فرم قطره‌ای مدرن */
+.marker-pin {
+    width: 30px;
+    height: 30px;
+    border-radius: 50% 50% 50% 0;
+    position: absolute;
+    transform: rotate(-45deg);
+    left: 50%;
+    top: 0;
+    margin-left: -15px;
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+    z-index: 2;
+    transition: all 0.3s ease;
+}
+
+/* نقطه سفید مرکزی با افکت شیشه‌ای */
+.marker-pin::after {
+    content: '';
+    width: 10px;
+    height: 10px;
+    margin: 8px 0 0 8px;
+    background: #fff;
+    position: absolute;
+    border-radius: 50%;
+    box-shadow: 0 0 5px rgba(0,0,0,0.2);
+    top: 2px;
+    right: 10px;
+}
+
+/* سایه زیر پین روی نقشه */
+.pin-shadow {
+    position: absolute;
+    width: 12px;
+    height: 4px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 50%;
+    bottom: -2px;
+    left: 50%;
+    margin-left: -6px;
+    filter: blur(2px);
+    z-index: 1;
+}
+
+/* افکت هاله نور هنگام نمایش (Glow) */
+.marker-pin:hover {
+    transform: rotate(-45deg) scale(1.1);
+    box-shadow: 0 0 15px rgba(255,255,255,0.5);
+}
+
+/* پالت رنگی خاص و شکیل */
+.status-completed { 
+    background: linear-gradient(135deg, #044a34 0%, #10b981 100%) !important; 
+} 
+
+.status-ongoing { 
+    background: linear-gradient(135deg, #6b3900 0%, #fbbf24 100%) !important; 
+} 
+
+.status-not-built { 
+    background: linear-gradient(135deg, #570d20 0%, #fb7185 100%) !important; 
+} 
+
+.status-default { 
+    background: linear-gradient(135deg, #283445 0%, #94a3b8 100%) !important; 
+} 
+.place-popup-wrapper .leaflet-popup-content-wrapper {
+    border-radius: 15px;
+    padding: 0;
+    overflow: hidden;
+}
+/* تنظیمات کلی سایدبار */
+#sidebar {
+    background: #ffffff;
+    border-left: 1px solid #edf2f7;
+    box-shadow: 4px 0 15px rgba(0, 0, 0, 0.03);
+    padding: 24px;
+    font-family: 'IRANSans', sans-serif; /* یا فونت محلی خودتان */
+}
+
+/* تیتر اصلی پنل */
+.sidebar-header {
+    padding-bottom: 20px;
+    margin-bottom: 24px;
+    border-bottom: 2px solid #f8fafc;
+}
+
+.sidebar-header h5 {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #1e293b;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* استایل بخش‌های ورودی (Label ها) */
+.filter-group-label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #64748b;
+    margin-bottom: 8px;
+    margin-top: 20px;
+}
+
+/* باکس جستجو */
+/* باکس کلی سرچ */
+.search-wrapper {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 12px !important;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    padding: 2px;
+}
+
+/* دکمه سرچ */
+#searchButton {
+    background-color: #38a169 !important; /* سبز برند */
+    color: white !important;
+    border: none !important;
+    border-radius: 10px !important;
+    width: 40px !important;
+    height: 40px !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 4px; /* فاصله از لبه */
+}
+
+#searchButton:hover {
+    background-color: #2f855a !important;
+    transform: scale(0.95);
+}
+
+/* آیکون داخل دکمه */
+#searchButton svg, #searchButton i {
+    fill: white !important; /* اگر SVG است */
+    color: white !important; /* اگر فونت است */
+    width: 18px;
+    height: 18px;
+}
+
+/* ورودی متن */
+#searchInput {
+    border: none !important;
+    background: transparent !important;
+    padding-right: 12px !important;
+    font-size: 0.9rem !important;
+    outline: none !important;
+    flex-grow: 1;
+}
+
+
+#statusFilterDropdown {
+    width: 100%;
+    padding: 12px 15px;
+    border-radius: 12px !important;
+    border: 1px solid #e2e8f0 !important;
+    background-color: #ffffff !important;
+    color: #475569 !important;
+    font-size: 0.9rem !important;
+    font-weight: 500;
+    cursor: pointer;
+    appearance: none; /* حذف فلش پیش‌فرض */
+    
+    /* اضافه کردن فلش سفارشی */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: left 15px center !important;
+    background-size: 18px !important;
+    
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+#statusFilterDropdown:focus {
+    border-color: #38a169 !important;
+    box-shadow: 0 0 0 3px rgba(56, 161, 105, 0.1) !important;
+    outline: none;
+}
+
+#statusFilterDropdown option {
+    padding: 10px;
+    background: #fff;
+    color: #334155;
+}
+
+/* لیست نتایج جستجو */
+#searchResults {
+    margin-top: 8px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    border: 1px solid #e2e8f0;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.result-item {
+    padding: 12px 15px;
+    border-bottom: 1px solid #f1f5f9;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.2s;
+}
+
+.result-item:hover {
+    background: #f8fafc;
+    color: #38a169;
+}

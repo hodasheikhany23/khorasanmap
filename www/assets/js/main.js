@@ -1,0 +1,436 @@
+
+var map = L.map('map', { 
+    zoomControl: true,
+    minZoom: 6,
+    maxZoom: 15
+}).setView([36.2972, 59.6068], 7);
+
+document.getElementById('map').style.background = '#f1f5f9';
+
+var cityLabels = L.layerGroup();
+var roadLabels = L.layerGroup();
+var roadNamesShown = new Set();
+var geojsonPlaces = [];
+
+var allPoints = [];
+var markersLayer = []; 
+
+// ---------------------------
+// Helpers
+// ---------------------------
+function slugifyType(str) {
+  return (str || 'unknown')
+    .toString()
+    .trim()
+    .replace(/\u200c/g, '')               // remove ZWNJ
+    .replace(/\s+/g, '-')                // spaces -> -
+    .replace(/[^\u0600-\u06FF\w-]/g, '')  // keep fa/latin/digit/_/-
+    .toLowerCase();
+}
+function getStatusClass(status) {
+  if (!status) return 'status-default';
+
+  status = status.trim();
+
+  if (status === 'تکمیل') return 'status-completed';
+  if (status === 'در دست ساخت') return 'status-ongoing';
+  if (status === 'ساخته نشده') return 'status-not-built';
+
+  return 'status-default';
+}
+
+function normalizePoint(p) {
+  const lat = Array.isArray(p.coords) ? Number(p.coords[0]) : Number(p.lat);
+  const lng = Array.isArray(p.coords) ? Number(p.coords[1]) : Number(p.lng);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) return null;
+
+  const title = `${p.location || 'عنوانی ثبت نشده'}${p.city ? ' - ' + p.city : ''}`.trim();
+
+  const desc =
+    `شهرستان: ${p.county || '-'}<br>` +
+    `شهر/بخش: ${p.city || '-'}<br>` +
+    `مکان: ${p.location || '-'}<br>` +
+    `تعداد شهدا: ${p.martyrs || '-'}<br>` +
+    `وضعیت: ${p.status || '-'}<br>` +
+    `تاریخ تدفین: ${p.burial || '-'}`;
+
+  return {
+    ...p,
+    lat,
+    lng,
+    // for CSS class use
+    typeSlug: slugifyType(p.type),
+    // for search convenience
+    name: p.location || p.city || p.county || '',
+    // keep compatibility with your popup code
+    contents: {
+      title,
+      desc,
+      images: p.image ? [p.image] : []
+    }
+  };
+}
+
+// ---------------------------
+// Base Layers (GeoJSON)
+// ---------------------------
+L.geoJSON(adminareaData, {
+    style: { color: "#94a3b8", weight: 2, fillColor: "#e2e8f0", fillOpacity: 0.15 }
+}).addTo(map);
+
+L.geoJSON(roadData, {
+    filter: f => ["motorway", "trunk", "primary"].includes(f.properties.fclass),
+    style: { color: "#64748b", weight: 1.2, opacity: 0.9 },
+      onEachFeature: function (feature, layer) {
+        let roadName = feature.properties.name;
+
+        if (roadName && !roadName.includes('?') && !roadNamesShown.has(roadName)) {
+          roadNamesShown.add(roadName);
+
+          if (layer.getBounds && layer.getBounds().isValid()) {
+            var center = layer.getBounds().getCenter();
+            var label = L.tooltip({
+              permanent: true,
+              direction: 'center',
+              className: 'road-label',
+              opacity: 0.8
+            })
+            .setLatLng(center)
+            .setContent(`<span style="font-family: Tahoma, Arial; direction: rtl;">${roadName}</span>`);
+            roadLabels.addLayer(label);
+          }
+        }
+      }
+    }).addTo(map);
+var cityLayer = L.layerGroup().addTo(map);    
+var townLayer = L.layerGroup();            
+var villageLayer = L.layerGroup();      
+
+
+    geojsonPlaces = data.features;
+    
+    L.geoJSON(data, {
+      pointToLayer: function (feature, latlng) {
+        var label = L.divIcon({
+          className: 'place-label',
+          html: `<div>${feature.properties.name}</div>`,
+          iconSize: [100, 20],
+          iconAnchor: [50, 10]
+        });
+        
+        // اضافه کردن zIndexOffset با مقدار منفی باعث می‌شود متن به لایه زیرین برود
+        var marker = L.marker(latlng, { 
+            icon: label, 
+            interactive: false,
+            zIndexOffset: -1000  // این خط متن را به پشت می‌برد
+        });
+        
+        const fclass = feature.properties.fclass;
+        if (fclass === 'city') {
+          marker.addTo(cityLayer);
+        } else if (fclass === 'town') {
+          marker.addTo(townLayer);
+        } else if (['village', 'hamlet'].includes(fclass)) {
+          marker.addTo(villageLayer);
+        }
+        return null;
+      }
+    });
+
+    updateLabels();
+
+
+
+
+
+// ---------------------------
+// Points (your dataset)
+// ---------------------------
+
+    allPoints = (data || []).map(normalizePoint).filter(Boolean);
+
+    allPoints.forEach(point => {
+        const statusClass = getStatusClass(point.status);
+        const myIcon = L.divIcon({
+            html: `<div class="marker-container">
+                     <div class="pin-shadow"></div>
+                     <div class="marker-pin ${statusClass}"></div>
+                     <div class="pin-glow"></div>
+                   </div>`,
+            className: 'custom-marker',
+            iconSize: [32, 42],
+            iconAnchor: [16, 42],
+            popupAnchor: [0, -40]
+        });
+
+        point._marker = L.marker([point.lat, point.lng], { 
+            icon: myIcon,
+            zIndexOffset: 1000 
+        }); // به نقشه addTo نمی کنیم تا applyFilters تصمیم بگیرد
+
+        point._marker.on('click', () => openPlacePopup(point));
+    });
+
+    applyFilters(); // فراخوانی اولیه برای نمایش همه نقاط
+
+
+// ---------------------------
+// Labels visibility
+// ---------------------------
+function updateLabels() {
+  var z = map.getZoom();
+  if (z >= 9) { map.addLayer(townLayer); } else { map.removeLayer(townLayer); }
+  if (z >= 12) { map.addLayer(villageLayer); } else { map.removeLayer(villageLayer); }
+  
+  if (z >= 14) { map.addLayer(roadLabels); } else { map.removeLayer(roadLabels); }
+}
+
+map.on("zoomend", updateLabels);
+
+// ---------------------------
+// Popup
+// ---------------------------
+function openPlacePopup(point) {
+  const images = point.contents?.images || [];
+  const imageUrl = images.length > 0 ? images[0] : 'placeholder.jpg';
+
+  // تعریف آیکون‌ها با استفاده از SVG Path
+  const icons = {
+    county: `<svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`,
+    city: `<svg viewBox="0 0 24 24"><path d="M15 11V5l-3-3-3 3v2H3v14h18V11h-6zm-8 8H5v-2h2v2zm0-4H5v-2h2v2zm0-4H5V9h2v2zm6 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V9h2v2zm0-4h-2V5h2v2zm6 12h-2v-2h2v2zm0-4h-2v-2h2v2z"/></svg>`,
+    location: `<svg viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>`,
+    martyrs: `<svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>`,
+    status: `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>`,
+    calendar: `<svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg>`,
+    target: `<svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>`,
+  };
+
+  const popupHtml = `
+    <div class="modern-card">
+      <div class="card-header-img" style="background-image: url('${imageUrl}')">
+        <button class="close-card-btn" onclick="map.closePopup();">×</button>
+      </div>
+      
+      <div class="card-body">
+        <h3 class="card-title">
+           <span>${point.contents?.title || 'بدون عنوان'}</span> 
+        </h3>
+        
+        <div class="info-list">
+          <div class="info-item">
+            <span class="info-label">شهرستان: <b>${point.county || '-'}</b></span>
+            <span class="info-icon">${icons.county}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">شهر/بخش: <b>${point.city || '-'}</b></span>
+            <span class="info-icon">${icons.city}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">مکان: <b>${point.location || '-'}</b></span>
+            <span class="info-icon">${icons.location}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">تعداد شهدا: <b>${point.martyrs || '۰'}</b></span>
+            <span class="info-icon">${icons.martyrs}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">وضعیت: <b>${point.status || '-'}</b></span>
+            <span class="info-icon">${icons.status}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">تاریخ تدفین: <b>${point.burial || '-'}</b></span>
+            <span class="info-icon">${icons.calendar}</span>
+          </div>
+          <div class="info-item no-border">
+          <span class="info-label ltr-text">
+            ${Number(point.lat).toFixed(5)} , ${Number(point.lng).toFixed(5)} :موقعیت
+          </span>
+          <span class="info-icon">${icons.target}</span>
+        </div>
+        </div>
+      </div>
+    </div>`;
+
+  point._marker.bindPopup(popupHtml, {
+    maxWidth: 350,
+    className: 'custom-leaflet-popup'
+  }).openPopup();
+}
+
+
+// ---------------------------
+// Search & Filter State
+// ---------------------------
+let currentSearchQuery = "";
+let currentStatusFilter = "all";
+
+
+// ---------------------------
+// اصلاح تابع فیلتر
+// ---------------------------
+function applyFilters() {
+
+    allPoints.forEach(point => {
+
+        const searchString =
+          `${point.location || ""} ${point.city || ""} ${point.county || ""}`
+          .toLowerCase();
+
+        const matchesSearch =
+          !currentSearchQuery ||
+          searchString.includes(currentSearchQuery);
+
+        const matchesStatus =
+        currentStatusFilter === "all" ||
+        (point.status && point.status.trim() === currentStatusFilter);
+
+
+        if (matchesSearch && matchesStatus) {
+
+            if (!map.hasLayer(point._marker))
+                point._marker.addTo(map);
+
+        } else {
+
+            if (map.hasLayer(point._marker))
+                map.removeLayer(point._marker);
+
+        }
+
+    });
+
+}
+
+
+// ---------------------------
+// Search
+// ---------------------------
+const searchInput = document.getElementById("searchInput");
+const searchButton = document.getElementById("searchButton");
+const resultsBox = document.getElementById("searchResults");
+
+function performSearch(){
+
+    if(!searchInput) return;
+
+    const query = searchInput.value.trim().toLowerCase();
+
+    currentSearchQuery = query;
+
+    if(query.length < 2){
+
+        if(resultsBox) resultsBox.style.display="none";
+
+        applyFilters();
+
+        return;
+    }
+
+    const results = allPoints.filter(p => {
+
+        const text =
+        `${p.location || ""} ${p.city || ""} ${p.county || ""}`
+        .toLowerCase();
+
+        return text.includes(query);
+
+    });
+
+    showSearchResults(results.slice(0,10));
+
+    applyFilters();
+
+}
+
+
+function showSearchResults(list){
+
+    if(!resultsBox) return;
+
+    resultsBox.innerHTML="";
+
+    if(list.length===0){
+
+        resultsBox.style.display="none";
+
+        return;
+
+    }
+
+    list.forEach(point=>{
+
+        const div=document.createElement("div");
+
+        div.className="result-item";
+
+        div.textContent=
+        `${point.location || "-"} - ${point.city || point.county || ""}`;
+
+        div.onclick=()=>{
+
+            resultsBox.style.display="none";
+
+            map.setView([point.lat,point.lng],12,{animate:true});
+
+            setTimeout(()=>openPlacePopup(point),300);
+
+        };
+
+        resultsBox.appendChild(div);
+
+    });
+
+    resultsBox.style.display="block";
+
+}
+
+
+// اجرای جستجو
+if(searchButton)
+searchButton.addEventListener("click",performSearch);
+
+if(searchInput){
+
+searchInput.addEventListener("input",performSearch);
+
+searchInput.addEventListener("keydown",function(e){
+
+    if(e.key==="Enter") performSearch();
+
+});
+
+}
+
+
+// بستن لیست نتایج
+document.addEventListener("click",function(e){
+
+    if(!e.target.closest(".search-wrapper") && resultsBox){
+
+        resultsBox.style.display="none";
+
+    }
+
+});
+
+
+// ---------------------------
+// Status Filter
+// ---------------------------
+
+
+// اگر dropdown باشد
+const statusDropdown = document.getElementById("statusFilterDropdown");
+
+if(statusDropdown){
+
+statusDropdown.addEventListener("change",function(e){
+
+    currentStatusFilter = e.target.value.trim();
+
+    applyFilters();
+
+});
+
+}
