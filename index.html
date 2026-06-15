@@ -8,6 +8,8 @@
     <link rel="stylesheet" href="assets/leaflet/leaflet.css" />
     <link rel="stylesheet" href="assets/css/bootstrap.rtl.min.css" />
     <link rel="stylesheet" href="assets/css/style.css" />
+    <link rel="manifest" href="manifest.json">
+
 </head>
 
 <body>
@@ -73,6 +75,14 @@
     <script src="places_khorasan.js"></script>
     <script src="points.js"></script>
     <script src="assets/js/main.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./service-worker.js')
+                .then(reg => console.log('Service Worker registered!'))
+                .catch(err => console.log('Service Worker registration failed:', err));
+            });
+        }
+    </script>
 </body>
-
 </html>
