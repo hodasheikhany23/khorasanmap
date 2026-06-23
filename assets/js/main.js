@@ -341,50 +341,132 @@ map.on("zoomend", function () {
   }, 180);
 });
 
-
 function normalizeFaText(str) {
   return (str || "")
     .toString()
-    .replace(/\u200c/g, "")
+    .normalize("NFKC")
+    .replace(/_/g, " ")              // خیلی مهم: آندرلاین به فاصله
+    .replace(/[،,]/g, " ")
+    .replace(/\u200c/g, " ")         // نیم‌فاصله به فاصله
     .replace(/ي/g, "ی")
     .replace(/ك/g, "ک")
+    .replace(/[إأآا]/g, "ا")         // آزاد / ازاد یکی شود
+    .replace(/[ًٌٍَُِّْ]/g, "")
+    .replace(/\.[a-zA-Z0-9]+$/g, " ") // حذف پسوند فایل مثل jpg
+    .replace(/[^آ-یa-zA-Z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
-    .trim();
+    .trim()
+    .toLowerCase();
+}
+
+function getWords(str) {
+  return normalizeFaText(str)
+    .split(" ")
+    .filter(Boolean)
+    .filter(word => word.length > 1)
+    // حذف عددهای تنها مثل 049
+    .filter(word => !/^\d+$/.test(word));
+}
+
+function getFileNameFromPath(path) {
+  return String(path || "").split("/").pop() || "";
 }
 
 function findFolder(point) {
   if (typeof folderImagesMap === "undefined") return null;
 
-  const city = normalizeFaText(point.city);
-  const location = normalizeFaText(point.location);
+  const pointCity = normalizeFaText(point.city || "");
+  const pointLoc = normalizeFaText(point.location || "");
+  const pointFull = `${pointCity} ${pointLoc}`.trim();
 
-  if (!city || !location) return null;
+  const pointWords = getWords(pointFull);
 
-  const folderKey = Object.keys(folderImagesMap).find(folder => {
-    const normalizedFolder = normalizeFaText(folder);
-    
-    return normalizedFolder.includes(city) && 
-           (normalizedFolder.includes(location) || location.includes(normalizedFolder.split('_')[2]));
+  console.log("🔍 findFolder target:", {
+    city: point.city,
+    location: point.location,
+    normalized: pointFull,
+    words: pointWords
   });
 
-  console.log(`Searching for: ${city} - ${location} | Found: ${folderKey}`);
+  const folderKeys = Object.keys(folderImagesMap);
 
-  return folderKey || null;
+  let bestMatch = null;
+  let highestScore = 0;
+  let bestDebug = null;
+
+  folderKeys.forEach(folder => {
+    const images = folderImagesMap[folder] || [];
+
+    // متن قابل جستجو = نام پوشه + نام فایل‌های داخلش
+    const fileNamesText = images
+      .map(path => getFileNameFromPath(path))
+      .join(" ");
+
+    const searchableText = `${folder} ${fileNamesText}`;
+    const searchableWords = getWords(searchableText);
+
+    let matches = 0;
+    const matchedWords = [];
+
+    pointWords.forEach(word => {
+      if (searchableWords.includes(word)) {
+        matches++;
+        matchedWords.push(word);
+      }
+    });
+
+    const score = pointWords.length
+      ? matches / pointWords.length
+      : 0;
+
+    if (score > highestScore) {
+      highestScore = score;
+      bestMatch = folder;
+      bestDebug = {
+        folder,
+        searchableWords,
+        matchedWords,
+        score
+      };
+    }
+  });
+
+  // آستانه 0.5 برای مواردی که نام فایل هم کمک می‌کند مناسب است
+  if (bestMatch && highestScore >= 0.5) {
+    console.log(
+      `✅ Folder found! Score: ${highestScore.toFixed(2)} | Key: ${bestMatch}`,
+      bestDebug
+    );
+    return bestMatch;
+  }
+
+  console.warn(
+    `❌ No match found. Best guess was: ${bestMatch} (Score: ${highestScore.toFixed(2)})`,
+    bestDebug
+  );
+
+  return null;
 }
+
 
 
 
 function buildImageSlider(images) {
   if (!images || images.length === 0) return "";
 
-  const slides = images.map((img, i) => `
-    <img
-      src="${encodeURI(img)}"
-      class="popup-slide ${i === 0 ? 'active' : ''}"
-      loading="lazy"
-      alt="تصویر مکان"
-    >
-  `).join("");
+  const slides = images.map((img, i) => {
+    const safeSrc = encodeURI(img);
+
+    return `
+      <img
+        src="${safeSrc}"
+        class="popup-slide ${i === 0 ? 'active' : ''}"
+        loading="lazy"
+        alt="تصویر مکان"
+        onerror="console.error('Image failed to load:', this.src)"
+      >
+    `;
+  }).join("");
 
   const controls = images.length > 1 ? `
     <button class="slider-prev" type="button">›</button>
@@ -400,6 +482,7 @@ function buildImageSlider(images) {
     </div>
   `;
 }
+
 
 
 
