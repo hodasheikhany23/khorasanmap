@@ -678,6 +678,9 @@ body.sidebar-open .header-content {
         font-size: 30px;
         cursor: pointer;
     }
+       .sidebar-toggle {
+        display: flex;
+    }
 }
 .result-city-item {
   background: #eff6ff;
@@ -725,4 +728,28 @@ body.sidebar-open .header-content {
   
   z-index: 10;
   pointer-events: none;
+}
+.sidebar-toggle {
+    position: fixed;
+    right: 15px;
+    bottom: 15px;
+    z-index: 3000; /* بالاتر از همه چیز */
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    display: none; /* پیش‌فرض مخفی */
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    border: none !important;
+    background-color: #38a169 !important; /* رنگ سبز */
+}
+.sidebar-toggle.is-hidden {
+    display: none !important;
+}
+
+@media (max-width: 768px) {
+    .sidebar-toggle {
+        display: flex !important; /* نمایش در موبایل */
+    }
 }

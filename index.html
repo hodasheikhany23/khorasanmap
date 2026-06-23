@@ -15,15 +15,15 @@
 
     <div id="map"></div>
 
-    <!-- دکمه باز کردن سایدبار در موبایل (اختیاری) -->
-    <button class="btn btn-primary d-md-none sidebar-toggle" type="button" data-bs-toggle="offcanvas"
-        data-bs-target="#infoSidebar">
-        🔍
+
+    <button id="sidebarOpenBtn" class="btn btn-primary d-md-none sidebar-toggle" type="button">
+        <svg viewBox="0 0 24 24" width="24" height="24"><path fill="white" d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16a6.47 6.47 0 004.23-1.57l.27.28v.79L20 21.5 21.5 20l-6-6zM9.5 14A4.5 4.5 0 119.5 5a4.5 4.5 0 010 9z" /></svg>
     </button>
+
+    
     <div id="infoSidebar" class="custom-sidebar show">
         <div class="sidebar-header-box">
             <h4 class="sidebar-title">پنل مدیریت نقشه</h4>
-            <!-- دکمه بستن برای موبایل -->
             <button type="button" class="close-sidebar-btn d-mobile-only" onclick="toggleSidebar()">×</button>
         </div>
 
@@ -68,5 +68,42 @@
             });
         }
     </script>
+  <script>
+    const sidebar = document.getElementById('infoSidebar');
+    const openBtn = document.getElementById('sidebarOpenBtn');
+    const closeBtn = document.querySelector('.close-sidebar-btn');
+
+    function openSidebar() {
+        sidebar.classList.add('show');
+        if (openBtn) openBtn.classList.add('is-hidden');
+    }
+
+    function closeSidebar() {
+        sidebar.classList.remove('show');
+        if (openBtn) openBtn.classList.remove('is-hidden');
+    }
+
+    function toggleSidebar() {
+        if (sidebar.classList.contains('show')) {
+            closeSidebar();
+        } else {
+            openSidebar();
+        }
+    }
+
+    if (openBtn) {
+        openBtn.addEventListener('click', openSidebar);
+    }
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeSidebar);
+    }
+
+    if (sidebar.classList.contains('show') && openBtn) {
+        openBtn.classList.add('is-hidden');
+    }
+</script>
+
+
 </body>
 </html>
