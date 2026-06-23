@@ -192,14 +192,85 @@ function updateLabels() {
 
 map.on("zoomend", updateLabels);
 
+function normalizeFaText(str) {
+  return (str || "")
+    .toString()
+    .replace(/\u200c/g, "")
+    .replace(/ي/g, "ی")
+    .replace(/ك/g, "ک")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function findFolder(point) {
+  if (typeof folderImagesMap === "undefined") return null;
+
+  const city = normalizeFaText(point.city);
+  const location = normalizeFaText(point.location);
+
+  if (!city || !location) return null;
+
+  const folderKey = Object.keys(folderImagesMap).find(folder => {
+    const normalizedFolder = normalizeFaText(folder);
+    
+    return normalizedFolder.includes(city) && 
+           (normalizedFolder.includes(location) || location.includes(normalizedFolder.split('_')[2]));
+  });
+
+  console.log(`Searching for: ${city} - ${location} | Found: ${folderKey}`);
+
+  return folderKey || null;
+}
+
+
+
+function buildImageSlider(images) {
+  if (!images || images.length === 0) return "";
+
+  const slides = images.map((img, i) => `
+    <img
+      src="${encodeURI(img)}"
+      class="popup-slide ${i === 0 ? 'active' : ''}"
+      loading="lazy"
+      alt="تصویر مکان"
+    >
+  `).join("");
+
+  const controls = images.length > 1 ? `
+    <button class="slider-prev" type="button">›</button>
+    <button class="slider-next" type="button">‹</button>
+  ` : "";
+
+  return `
+    <div class="popup-slider">
+      <div class="popup-slides">
+        ${slides}
+      </div>
+      ${controls}
+    </div>
+  `;
+}
+
+
+
 // ---------------------------
 // Popup
 // ---------------------------
 function openPlacePopup(point) {
-  const images = point.contents?.images || [];
-  const imageUrl = images.length > 0 ? images[0] : 'placeholder.jpg';
 
-  // تعریف آیکون‌ها با استفاده از SVG Path
+  // پیدا کردن پوشه تصاویر
+  const folder = findFolder(point);
+
+  // گرفتن لیست تصاویر
+  const images = folder ? folderImagesMap[folder] : [];
+
+  const sliderHtml = images.length > 0 ? buildImageSlider(images) : "";
+console.log("folder =", folder);
+console.log("images =", images);
+console.log("map exists =", typeof folderImagesMap !== "undefined");
+console.log("keys sample =", typeof folderImagesMap !== "undefined" ? Object.keys(folderImagesMap).slice(0, 10) : "no map");
+
+ // تعریف آیکون‌ها با استفاده از SVG Path
   const icons = {
     county: `<svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`,
     city: `<svg viewBox="0 0 24 24"><path d="M15 11V5l-3-3-3 3v2H3v14h18V11h-6zm-8 8H5v-2h2v2zm0-4H5v-2h2v2zm0-4H5V9h2v2zm6 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V9h2v2zm0-4h-2V5h2v2zm6 12h-2v-2h2v2zm0-4h-2v-2h2v2z"/></svg>`,
@@ -211,57 +282,104 @@ function openPlacePopup(point) {
   };
 
   const popupHtml = `
-    <div class="modern-card">
-      <div class="card-header-img" style="background-image: url('${imageUrl}')">
-        <button class="close-card-btn" onclick="map.closePopup();">×</button>
-      </div>
-      
-      <div class="card-body">
-        <h3 class="card-title">
-           <span>${point.contents?.title || 'بدون عنوان'}</span> 
-        </h3>
-        
-        <div class="info-list">
-          <div class="info-item">
-            <span class="info-label">شهرستان: <b>${point.county || '-'}</b></span>
-            <span class="info-icon">${icons.county}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">شهر/بخش: <b>${point.city || '-'}</b></span>
-            <span class="info-icon">${icons.city}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">مکان: <b>${point.location || '-'}</b></span>
-            <span class="info-icon">${icons.location}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">تعداد شهدا: <b>${point.martyrs || '۰'}</b></span>
-            <span class="info-icon">${icons.martyrs}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">وضعیت: <b>${point.status || '-'}</b></span>
-            <span class="info-icon">${icons.status}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">تاریخ تدفین: <b>${point.burial || '-'}</b></span>
-            <span class="info-icon">${icons.calendar}</span>
-          </div>
-          <div class="info-item no-border">
+  <div class="modern-card">
+
+  ${sliderHtml ? `
+    <div class="card-header-img">
+      ${sliderHtml}
+      <button class="close-card-btn" onclick="map.closePopup();">×</button>
+    </div>
+  ` : `
+    <button class="close-card-btn close-card-btn-no-img" onclick="map.closePopup();">×</button>
+  `}
+
+    <div class="card-body">
+
+      <h3 class="card-title">
+        <span>${point.contents?.title || 'بدون عنوان'}</span>
+      </h3>
+
+      <div class="info-list">
+
+        <div class="info-item">
+          <span class="info-label">شهرستان: <b>${point.county || '-'}</b></span>
+          <span class="info-icon">${icons.county}</span>
+        </div>
+
+        <div class="info-item">
+          <span class="info-label">شهر/بخش: <b>${point.city || '-'}</b></span>
+          <span class="info-icon">${icons.city}</span>
+        </div>
+
+        <div class="info-item">
+          <span class="info-label">مکان: <b>${point.location || '-'}</b></span>
+          <span class="info-icon">${icons.location}</span>
+        </div>
+
+        <div class="info-item">
+          <span class="info-label">تعداد شهدا: <b>${point.martyrs || '۰'}</b></span>
+          <span class="info-icon">${icons.martyrs}</span>
+        </div>
+
+        <div class="info-item">
+          <span class="info-label">وضعیت: <b>${point.status || '-'}</b></span>
+          <span class="info-icon">${icons.status}</span>
+        </div>
+
+        <div class="info-item">
+          <span class="info-label">تاریخ تدفین: <b>${point.burial || '-'}</b></span>
+          <span class="info-icon">${icons.calendar}</span>
+        </div>
+
+        <div class="info-item no-border">
           <span class="info-label ltr-text">
             ${Number(point.lat).toFixed(5)} , ${Number(point.lng).toFixed(5)} :موقعیت
           </span>
           <span class="info-icon">${icons.target}</span>
         </div>
-        </div>
-      </div>
-    </div>`;
 
-  point._marker.bindPopup(popupHtml, {
-    maxWidth: 350,
-    className: 'custom-leaflet-popup'
-  }).openPopup();
+      </div>
+
+    </div>
+  </div>
+  `;
+
+  point._marker.unbindPopup(); // ابتدا اتصال قبلی را پاک کنید
+  point._marker.bindPopup(popupHtml, { 
+      maxWidth: 350, 
+      className: 'custom-leaflet-popup' 
+  });
+  point._marker.openPopup();
 }
 
+map.on("popupopen", function () {
+  const slider = document.querySelector(".leaflet-popup .popup-slider");
+  if (!slider) return;
+
+  const slides = slider.querySelectorAll(".popup-slide");
+  const next = slider.querySelector(".slider-next");
+  const prev = slider.querySelector(".slider-prev");
+
+  if (!slides.length || !next || !prev) return;
+
+  let index = 0;
+
+  function showSlide(newIndex) {
+    slides[index].classList.remove("active");
+    index = newIndex;
+    slides[index].classList.add("active");
+  }
+
+  next.addEventListener("click", function (e) {
+    e.stopPropagation();
+    showSlide((index + 1) % slides.length);
+  });
+
+  prev.addEventListener("click", function (e) {
+    e.stopPropagation();
+    showSlide((index - 1 + slides.length) % slides.length);
+  });
+});
 
 // ---------------------------
 // اصلاح تابع فیلتر

@@ -20,6 +20,8 @@ const urlsToCache = [
   "./assets/leaflet/leaflet.css"
 ];
 
+
+
 self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE_NAME)

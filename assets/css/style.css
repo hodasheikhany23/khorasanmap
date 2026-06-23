@@ -334,7 +334,7 @@ body.sidebar-open .header-content {
     border-left: 1px solid #edf2f7;
     box-shadow: 4px 0 15px rgba(0, 0, 0, 0.03);
     padding: 24px;
-    font-family: 'IRANSans', sans-serif; /* یا فونت محلی خودتان */
+    font-family: 'IRANSans', sans-serif; 
 }
 
 /* تیتر اصلی پنل */
@@ -413,6 +413,7 @@ body.sidebar-open .header-content {
     font-size: 0.9rem !important;
     outline: none !important;
     flex-grow: 1;
+    font-family:  'IRANSans', sans-serif; ;
 }
 
 
@@ -425,6 +426,7 @@ body.sidebar-open .header-content {
     color: #475569 !important;
     font-size: 0.9rem !important;
     font-weight: 500;
+    font-family:  'IRANSans', sans-serif;
     cursor: pointer;
     appearance: none;
     direction: rtl;
@@ -448,6 +450,8 @@ body.sidebar-open .header-content {
     padding: 10px;
     background: #fff;
     color: #334155;
+    font-family:  'IRANSans', sans-serif;
+
 }
 
 /* لیست نتایج جستجو */
@@ -530,5 +534,148 @@ body.sidebar-open .header-content {
     /* کنترل‌های زوم نقشه */
     .leaflet-control-zoom {
         display: none !important; /* در موبایل معمولاً با انگشت زوم می‌کنند */
+    }
+}
+.card-header-img {
+  position: relative;
+  width: 100%;
+  height: 190px;
+  overflow: hidden;
+  border-radius: 16px 16px 0 0;
+  background: #e5e7eb;
+}
+
+.popup-slider,
+.popup-slides {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.popup-slide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity .25s ease;
+}
+
+.popup-slide.active {
+  opacity: 1;
+}
+
+.slider-prev,
+.slider-next {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(15, 23, 42, .55);
+  font-size: 24px;
+  line-height: 28px;
+  cursor: pointer;
+}
+
+.slider-prev {
+  left: 10px;
+}
+
+.slider-next {
+  right: 10px;
+}
+
+.close-card-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+}
+
+.close-card-btn-no-img {
+  top: 8px;
+  right: 8px;
+}
+/* جایگزین Offcanvas بوت‌استرپ */
+.custom-sidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 350px;
+    height: 100vh;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    box-shadow: -5px 0 25px rgba(0,0,0,0.1);
+    z-index: 2000;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%); /* پیش‌فرض بسته */
+}
+
+.custom-sidebar.show {
+    transform: translateX(0); /* نمایش */
+}
+
+.sidebar-header-box {
+    background: #2f855a;
+    color: white;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sidebar-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.sidebar-content {
+    padding: 20px;
+    overflow-y: auto;
+    flex-grow: 1;
+}
+
+.sidebar-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: #4a5568;
+    font-size: 14px;
+    margin-top: 5px;
+}
+
+/* Utilities */
+.d-mobile-only { display: none; }
+
+@media (max-width: 768px) {
+    .custom-sidebar {
+        width: 100%;
+        height: auto;
+        max-height: 70vh;
+        top: auto;
+        bottom: 0;
+        transform: translateY(100%);
+        border-radius: 20px 20px 0 0;
+    }
+    .custom-sidebar.show {
+        transform: translateY(0);
+    }
+    .d-mobile-only { display: block; }
+    
+    .close-sidebar-btn {
+        background: none;
+        border: none;
+        color: white;
+        font-size: 30px;
+        cursor: pointer;
     }
 }
