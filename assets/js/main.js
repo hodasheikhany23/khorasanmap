@@ -1,10 +1,15 @@
+const isMobile = window.innerWidth <= 768;
 
 var map = L.map('map', { 
-    zoomControl: true,
-    minZoom: 6,
-    maxZoom: 15
+  zoomControl: true,
+  minZoom: 6,
+  maxZoom: 15,
+  preferCanvas: true,
+  zoomAnimation: !isMobile,
+  markerZoomAnimation: !isMobile,
+  fadeAnimation: !isMobile
 }).setView([36.2972, 59.6068], 7);
-const isMobile = window.innerWidth <= 768;
+
 const visibleMarkersLayer = L.layerGroup().addTo(map);
 
 let renderTimer = null;
@@ -131,8 +136,20 @@ function roadFilter(feature) {
 function renderRoads() {
   if (typeof roadData === 'undefined') return;
 
+  const zoom = map.getZoom();
+
+  if (isMobile && zoom < 10) {
+    if (roadsLayer) {
+      map.removeLayer(roadsLayer);
+      roadsLayer = null;
+    }
+    roadLabels.clearLayers();
+    return;
+  }
+
   if (roadsLayer) {
     map.removeLayer(roadsLayer);
+    roadsLayer = null;
   }
 
   roadNamesShown.clear();
@@ -142,35 +159,35 @@ function renderRoads() {
     filter: roadFilter,
     style: {
       color: "#64748b",
-      weight: isMobile ? 0.8 : 1.2,
-      opacity: isMobile ? 0.65 : 0.9
+      weight: isMobile ? 0.7 : 1.2,
+      opacity: isMobile ? 0.55 : 0.9
     },
     onEachFeature: function (feature, layer) {
       if (isMobile) return;
 
-      let roadName = feature.properties.name;
+      const roadName = feature.properties.name;
+      if (!roadName || roadName.includes('?') || roadNamesShown.has(roadName)) return;
 
-      if (roadName && !roadName.includes('?') && !roadNamesShown.has(roadName)) {
-        roadNamesShown.add(roadName);
+      roadNamesShown.add(roadName);
 
-        if (layer.getBounds && layer.getBounds().isValid()) {
-          var center = layer.getBounds().getCenter();
+      if (layer.getBounds && layer.getBounds().isValid()) {
+        const center = layer.getBounds().getCenter();
 
-          var label = L.tooltip({
+        roadLabels.addLayer(
+          L.tooltip({
             permanent: true,
             direction: 'center',
             className: 'road-label',
             opacity: 0.8
           })
           .setLatLng(center)
-          .setContent(`<span style="font-family: Tahoma; direction: rtl;">${roadName}</span>`);
-
-          roadLabels.addLayer(label);
-        }
+          .setContent(`<span style="font-family: Tahoma; direction: rtl;">${roadName}</span>`)
+        );
       }
     }
   }).addTo(map);
 }
+
 
 renderRoads();
 
@@ -206,38 +223,40 @@ function renderPlaces() {
 
   geojsonPlaces = placesData.features;
 
-  const bounds = map.getBounds().pad(0.3);
+  const bounds = map.getBounds().pad(isMobile ? 0.05 : 0.2);
+  const zoom = map.getZoom();
 
-  geojsonPlaces.forEach(feature => {
-    if (!shouldShowPlace(feature)) return;
+  for (const feature of geojsonPlaces) {
+    if (!shouldShowPlace(feature)) continue;
 
     const coords = feature.geometry && feature.geometry.coordinates;
-    if (!coords) return;
+    if (!coords) continue;
 
     const latlng = L.latLng(coords[1], coords[0]);
 
-    if (!bounds.contains(latlng)) return;
+    if (!bounds.contains(latlng)) continue;
 
-    const label = L.divIcon({
-      className: 'place-label',
-      html: `<div>${feature.properties.name || ""}</div>`,
-      iconSize: [100, 20],
-      iconAnchor: [50, 10]
-    });
+    const fclass = feature.properties.fclass;
+    const name = feature.properties.name || "";
 
     const marker = L.marker(latlng, {
-      icon: label,
+      icon: L.divIcon({
+        className: 'place-label',
+        html: `<div>${name}</div>`,
+        iconSize: [100, 20],
+        iconAnchor: [50, 10]
+      }),
       interactive: false,
       zIndexOffset: -1000
     });
 
-    const fclass = feature.properties.fclass;
-
     if (fclass === 'city') marker.addTo(cityLayer);
     else if (fclass === 'town') marker.addTo(townLayer);
     else if (['village', 'hamlet'].includes(fclass)) marker.addTo(villageLayer);
-  });
+  }
 }
+
+
 
 renderPlaces();
 
@@ -319,15 +338,12 @@ function updateLabels() {
   else map.removeLayer(roadLabels);
 }
 
-
 map.on("moveend", function () {
   debounceRender(function () {
     if (isPopupOpen) return;
 
-    renderPlaces();
     applyFilters();
-    updateLabels();
-  }, 180);
+  }, isMobile ? 350 : 150);
 });
 
 map.on("zoomend", function () {
@@ -338,8 +354,9 @@ map.on("zoomend", function () {
     renderPlaces();
     applyFilters();
     updateLabels();
-  }, 180);
+  }, isMobile ? 450 : 180);
 });
+
 
 function normalizeFaText(str) {
   return (str || "")
@@ -636,7 +653,6 @@ function applyFilters() {
   const zoom = map.getZoom();
 
   let renderedCount = 0;
-  const maxMobileMarkers = 250;
 
   for (const point of allPoints) {
     const searchString =
