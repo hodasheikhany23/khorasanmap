@@ -331,6 +331,167 @@ if (typeof pointsData !== 'undefined') {
 // در نهایت اجرای فیلترها و لیبل‌ها
 applyFilters();
 updateLabels();
+function groupPointsByGrid(points, cellSize) {
+
+  const grid = new Map();
+
+  points.forEach(p => {
+
+    const latKey = Math.floor(p.lat / cellSize);
+    const lngKey = Math.floor(p.lng / cellSize);
+
+    const key = latKey + "_" + lngKey;
+
+    if (!grid.has(key)) {
+      grid.set(key, []);
+    }
+
+    grid.get(key).push(p);
+
+  });
+
+  return grid;
+}
+
+
+
+function applyFilters() {
+
+  visibleMarkersLayer.clearLayers();
+  cityClusterLayer.clearLayers();
+
+  const bounds = map.getBounds().pad(0.2);
+  const zoom = map.getZoom();
+
+  const filteredPoints = [];
+
+  for (const point of allPoints) {
+
+    const searchString =
+      `${point.location || ""} ${point.city || ""} ${point.county || ""}`
+      .toLowerCase();
+
+    const matchesSearch =
+      !currentSearchQuery ||
+      searchString.includes(currentSearchQuery);
+
+    const matchesStatus =
+      currentStatusFilter === "all" ||
+      (point.status && point.status.trim() === currentStatusFilter);
+
+    if (!matchesSearch || !matchesStatus) continue;
+
+    const latlng = L.latLng(point.lat, point.lng);
+
+    if (!currentSearchQuery && !bounds.contains(latlng)) continue;
+
+    filteredPoints.push(point);
+  }
+
+
+  if(!currentSearchQuery && zoom < 6){
+
+    const largeRegionGroups = groupPointsByGrid(filteredPoints,5);
+پ
+
+    largeRegionGroups.forEach(points => {
+
+      if(points.length === 1){
+
+        visibleMarkersLayer.addLayer(
+          createPointMarker(points[0])
+        );
+
+      }else{
+
+        cityClusterLayer.addLayer(
+          createCityClusterMarker("large-region",points)
+        );
+
+      }
+
+    });
+
+    return;
+  }
+
+
+  // -------------------------
+  // زوم خیلی کم → کلاستر منطقه‌ای
+  // -------------------------
+
+  if(!currentSearchQuery && zoom < 8){
+
+    const regionGroups = groupPointsByGrid(filteredPoints,0.5);
+    // 0.5 درجه ≈ حدود 50km
+
+    regionGroups.forEach(points => {
+
+      if(points.length === 1){
+
+        visibleMarkersLayer.addLayer(
+          createPointMarker(points[0])
+        );
+
+      }else{
+
+        cityClusterLayer.addLayer(
+          createCityClusterMarker("region",points)
+        );
+
+      }
+
+    });
+
+    return;
+  }
+
+
+  // -------------------------
+  // زوم متوسط → کلاستر شهری
+  // -------------------------
+
+  if(!currentSearchQuery && zoom < 11){
+
+    const cityGroups = groupPointsByCity(filteredPoints);
+
+    cityGroups.forEach((points,city)=>{
+
+      if(points.length === 1){
+
+        visibleMarkersLayer.addLayer(
+          createPointMarker(points[0])
+        );
+
+      }else{
+
+        cityClusterLayer.addLayer(
+          createCityClusterMarker(city,points)
+        );
+
+      }
+
+    });
+
+    return;
+  }
+
+
+  // -------------------------
+  // زوم بالا → مارکر واقعی
+  // -------------------------
+
+  for(const point of filteredPoints){
+
+    visibleMarkersLayer.addLayer(
+      createPointMarker(point)
+    );
+
+  }
+
+}
+
+
 function createPointMarker(point) {
   if (point._marker) return point._marker;
 
@@ -673,10 +834,40 @@ function applyFilters() {
 
 
   // -------------------------
-  // زوم کم → کلاستر شهری
+  // زوم خیلی کم → کلاستر منطقه‌ای
   // -------------------------
 
-  if(!currentSearchQuery && zoom < 10){
+  if(!currentSearchQuery && zoom < 8){
+
+    const gridGroups = groupPointsByGrid(filteredPoints,0.5);
+
+    gridGroups.forEach(points => {
+
+      if(points.length === 1){
+
+        visibleMarkersLayer.addLayer(
+          createPointMarker(points[0])
+        );
+
+      }else{
+
+        cityClusterLayer.addLayer(
+          createCityClusterMarker("region",points)
+        );
+
+      }
+
+    });
+
+    return;
+  }
+
+
+  // -------------------------
+  // زوم متوسط → کلاستر شهری
+  // -------------------------
+
+  if(!currentSearchQuery && zoom < 11){
 
     const cityGroups = groupPointsByCity(filteredPoints);
 
