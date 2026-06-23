@@ -405,15 +405,16 @@ map.on("zoomend", function () {
 function normalizeFaText(str) {
   return (str || "")
     .toString()
-    .replace(/[،,]/g, " ") 
-    .replace(/\u200c/g, "")
+    .replace(/[،,_\-\/]+/g, " ")
+    .replace(/\u200c/g, " ")
     .replace(/ي/g, "ی")
     .replace(/ك/g, "ک")
-    .replace(/[^آ-یa-zA-Z0-9\s]/g, "") 
+    .replace(/[^آ-یa-zA-Z0-9\s]/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
 }
+
 
 function findFolder(point) {
   if (typeof folderImagesMap === "undefined") return null;
@@ -493,9 +494,6 @@ function buildImageSlider(images) {
     </div>
   `;
 }
-
-
-
 
 // ---------------------------
 // Popup
