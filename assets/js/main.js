@@ -332,14 +332,11 @@ if (typeof pointsData !== 'undefined') {
 applyFilters();
 updateLabels();
 function groupPointsByGrid(points, cellSize) {
-
   const grid = new Map();
 
   points.forEach(p => {
-
     const latKey = Math.floor(p.lat / cellSize);
     const lngKey = Math.floor(p.lng / cellSize);
-
     const key = latKey + "_" + lngKey;
 
     if (!grid.has(key)) {
@@ -347,12 +344,24 @@ function groupPointsByGrid(points, cellSize) {
     }
 
     grid.get(key).push(p);
-
   });
 
   return grid;
 }
+function getAdaptiveGridGroups(points, startCellSize, maxGroups) {
+  let cellSize = startCellSize;
+  let groups = groupPointsByGrid(points, cellSize);
 
+  let safety = 0;
+
+  while (groups.size > maxGroups && safety < 12) {
+    cellSize *= 1.7;
+    groups = groupPointsByGrid(points, cellSize);
+    safety++;
+  }
+
+  return groups;
+}
 
 
 function applyFilters() {
@@ -360,7 +369,7 @@ function applyFilters() {
   visibleMarkersLayer.clearLayers();
   cityClusterLayer.clearLayers();
 
-  const bounds = map.getBounds().pad(0.2);
+  const bounds = map.getBounds().pad(0.15);
   const zoom = map.getZoom();
 
   const filteredPoints = [];
@@ -388,108 +397,101 @@ function applyFilters() {
     filteredPoints.push(point);
   }
 
+  // -------------------------
+  // هنگام جستجو: همیشه نقاط واقعی را نشان بده
+  // -------------------------
+  if (currentSearchQuery) {
+    for (const point of filteredPoints) {
+      visibleMarkersLayer.addLayer(createPointMarker(point));
+    }
+    return;
+  }
 
-  if(!currentSearchQuery && zoom < 6){
+  // -------------------------
+  // زوم خیلی خیلی کم
+  // هدف: تعداد مارکر خیلی کم (مثلاً حداکثر 6)
+  // -------------------------
+  if (zoom < 5) {
 
-    const largeRegionGroups = groupPointsByGrid(filteredPoints,5);
-پ
+    const groups = getAdaptiveGridGroups(filteredPoints, 6, 6);
 
-    largeRegionGroups.forEach(points => {
-
-      if(points.length === 1){
-
-        visibleMarkersLayer.addLayer(
-          createPointMarker(points[0])
-        );
-
-      }else{
-
-        cityClusterLayer.addLayer(
-          createCityClusterMarker("large-region",points)
-        );
-
-      }
-
+    groups.forEach(points => {
+      cityClusterLayer.addLayer(
+        createCityClusterMarker("mega-region", points)
+      );
     });
 
     return;
   }
 
-
   // -------------------------
-  // زوم خیلی کم → کلاستر منطقه‌ای
+  // زوم کم
+  // هدف: حداکثر حدود 10 کلاستر
   // -------------------------
+  if (zoom < 7) {
 
-  if(!currentSearchQuery && zoom < 8){
+    const groups = getAdaptiveGridGroups(filteredPoints, 3, 10);
 
-    const regionGroups = groupPointsByGrid(filteredPoints,0.5);
-    // 0.5 درجه ≈ حدود 50km
-
-    regionGroups.forEach(points => {
-
-      if(points.length === 1){
-
-        visibleMarkersLayer.addLayer(
-          createPointMarker(points[0])
-        );
-
-      }else{
-
-        cityClusterLayer.addLayer(
-          createCityClusterMarker("region",points)
-        );
-
-      }
-
+    groups.forEach(points => {
+      cityClusterLayer.addLayer(
+        createCityClusterMarker("large-region", points)
+      );
     });
 
     return;
   }
 
+  // -------------------------
+  // زوم متوسط پایین
+  // هدف: حداکثر حدود 18 کلاستر
+  // -------------------------
+  if (zoom < 9) {
+
+    const groups = getAdaptiveGridGroups(filteredPoints, 1.2, 18);
+
+    groups.forEach(points => {
+      cityClusterLayer.addLayer(
+        createCityClusterMarker("region", points)
+      );
+    });
+
+    return;
+  }
 
   // -------------------------
-  // زوم متوسط → کلاستر شهری
+  // زوم متوسط
+  // کلاستر شهری
   // -------------------------
-
-  if(!currentSearchQuery && zoom < 11){
+  if (zoom < 11) {
 
     const cityGroups = groupPointsByCity(filteredPoints);
 
-    cityGroups.forEach((points,city)=>{
-
-      if(points.length === 1){
-
+    cityGroups.forEach((points, city) => {
+      if (points.length === 1) {
         visibleMarkersLayer.addLayer(
           createPointMarker(points[0])
         );
-
-      }else{
-
+      } else {
         cityClusterLayer.addLayer(
-          createCityClusterMarker(city,points)
+          createCityClusterMarker(city, points)
         );
-
       }
-
     });
 
     return;
   }
 
-
   // -------------------------
-  // زوم بالا → مارکر واقعی
+  // زوم بالا
+  // مارکرهای واقعی
   // -------------------------
-
-  for(const point of filteredPoints){
-
+  for (const point of filteredPoints) {
     visibleMarkersLayer.addLayer(
       createPointMarker(point)
     );
-
   }
-
 }
+
 
 
 function createPointMarker(point) {
