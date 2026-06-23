@@ -8,6 +8,7 @@ const isMobile = window.innerWidth <= 768;
 const visibleMarkersLayer = L.layerGroup().addTo(map);
 
 let renderTimer = null;
+let isPopupOpen = false;
 
 function debounceRender(fn, delay = 150) {
   clearTimeout(renderTimer);
@@ -302,26 +303,27 @@ function updateLabels() {
   else map.removeLayer(roadLabels);
 }
 
+map.on("moveend", function () {
+  if (isPopupOpen) return;
 
-map.on("zoomend", updateLabels);
-map.on("moveend zoomend", function () {
   debounceRender(function () {
     renderPlaces();
-    renderRoads();
     applyFilters();
     updateLabels();
   }, 180);
 });
 
-function normalizeFaText(str) {
-  return (str || "")
-    .toString()
-    .replace(/\u200c/g, "")
-    .replace(/ي/g, "ی")
-    .replace(/ك/g, "ک")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+map.on("zoomend", function () {
+  if (isPopupOpen) return;
+
+  debounceRender(function () {
+    renderRoads();
+    renderPlaces();
+    applyFilters();
+    updateLabels();
+  }, 180);
+});
+
 
 function findFolder(point) {
   if (typeof folderImagesMap === "undefined") return null;
@@ -376,7 +378,11 @@ function buildImageSlider(images) {
 // Popup
 // ---------------------------
 function openPlacePopup(point) {
+const marker = createPointMarker(point);
 
+if (!visibleMarkersLayer.hasLayer(marker)) {
+  visibleMarkersLayer.addLayer(marker);
+}
   // پیدا کردن پوشه تصاویر
   const folder = findFolder(point);
 
@@ -459,15 +465,23 @@ function openPlacePopup(point) {
   </div>
   `;
 
-  point._marker.unbindPopup(); // ابتدا اتصال قبلی را پاک کنید
-  point._marker.bindPopup(popupHtml, { 
-      maxWidth: 350, 
-      className: 'custom-leaflet-popup' 
+  marker.unbindPopup();
+  marker.bindPopup(popupHtml, { 
+    maxWidth: 350,
+    className: 'custom-leaflet-popup',
+    autoClose: false,
+    closeOnClick: false
   });
-  point._marker.openPopup();
+  marker.openPopup();
+
 }
+map.on("popupclose", function () {
+  isPopupOpen = false;
+  applyFilters();
+});
 
 map.on("popupopen", function () {
+  isPopupOpen = true;
   const slider = document.querySelector(".leaflet-popup .popup-slider");
   if (!slider) return;
 
@@ -524,12 +538,6 @@ function applyFilters() {
     if (!matchesSearch || !matchesStatus) continue;
 
     const latlng = L.latLng(point.lat, point.lng);
-
-    if (!bounds.contains(latlng) && !currentSearchQuery) continue;
-
-    if (isMobile && !currentSearchQuery && zoom < 9) {
-      continue;
-    }
 
     if (isMobile && renderedCount >= maxMobileMarkers && !currentSearchQuery) {
       break;
