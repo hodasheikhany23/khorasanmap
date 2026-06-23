@@ -27,7 +27,7 @@ var roadNamesShown = new Set();
 var geojsonPlaces = [];
 
 var allPoints = [];
-var markersLayer = L.layerGroup().addTo(map);
+// var markersLayer = L.layerGroup().addTo(map);
 
 
 // ---------------------------
@@ -247,14 +247,30 @@ renderPlaces();
 // ---------------------------
 if (typeof pointsData !== 'undefined') {
     allPoints = (pointsData || []).map(normalizePoint).filter(Boolean);
+    allPoints.forEach(point => {
+        const statusClass = getStatusClass(point.status);
+        const myIcon = L.divIcon({
+            html: `<div class="marker-container">
+                     <div class="pin-shadow"></div>
+                     <div class="marker-pin ${statusClass}"></div>
+                     <div class="pin-glow"></div>
+                   </div>`,
+            className: 'custom-marker',
+            iconSize: [32, 42], iconAnchor: [16, 42], popupAnchor: [0, -40]
+        });
+
+        point._marker = L.marker([point.lat, point.lng], { 
+            icon: myIcon,
+            zIndexOffset: 1000 
+        }); 
+
+        point._marker.on('click', () => openPlacePopup(point));
+    });
 }
 
 // در نهایت اجرای فیلترها و لیبل‌ها
-renderPlaces();
-renderRoads();
 applyFilters();
 updateLabels();
-
 function createPointMarker(point) {
   if (point._marker) return point._marker;
 
@@ -303,10 +319,11 @@ function updateLabels() {
   else map.removeLayer(roadLabels);
 }
 
-map.on("moveend", function () {
-  if (isPopupOpen) return;
 
+map.on("moveend", function () {
   debounceRender(function () {
+    if (isPopupOpen) return;
+
     renderPlaces();
     applyFilters();
     updateLabels();
@@ -314,9 +331,9 @@ map.on("moveend", function () {
 });
 
 map.on("zoomend", function () {
-  if (isPopupOpen) return;
-
   debounceRender(function () {
+    if (isPopupOpen) return;
+
     renderRoads();
     renderPlaces();
     applyFilters();
@@ -324,6 +341,16 @@ map.on("zoomend", function () {
   }, 180);
 });
 
+
+function normalizeFaText(str) {
+  return (str || "")
+    .toString()
+    .replace(/\u200c/g, "")
+    .replace(/ي/g, "ی")
+    .replace(/ك/g, "ک")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 function findFolder(point) {
   if (typeof folderImagesMap === "undefined") return null;
@@ -339,6 +366,8 @@ function findFolder(point) {
     return normalizedFolder.includes(city) && 
            (normalizedFolder.includes(location) || location.includes(normalizedFolder.split('_')[2]));
   });
+
+  console.log(`Searching for: ${city} - ${location} | Found: ${folderKey}`);
 
   return folderKey || null;
 }
@@ -378,20 +407,14 @@ function buildImageSlider(images) {
 // Popup
 // ---------------------------
 function openPlacePopup(point) {
-const marker = createPointMarker(point);
 
-if (!visibleMarkersLayer.hasLayer(marker)) {
-  visibleMarkersLayer.addLayer(marker);
-}
-  // پیدا کردن پوشه تصاویر
   const folder = findFolder(point);
 
-  // گرفتن لیست تصاویر
   const images = folder ? folderImagesMap[folder] : [];
 
   const sliderHtml = images.length > 0 ? buildImageSlider(images) : "";
 
- // تعریف آیکون‌ها با استفاده از SVG Path
+
   const icons = {
     county: `<svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`,
     city: `<svg viewBox="0 0 24 24"><path d="M15 11V5l-3-3-3 3v2H3v14h18V11h-6zm-8 8H5v-2h2v2zm0-4H5v-2h2v2zm0-4H5V9h2v2zm6 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V9h2v2zm0-4h-2V5h2v2zm6 12h-2v-2h2v2zm0-4h-2v-2h2v2z"/></svg>`,
@@ -465,19 +488,29 @@ if (!visibleMarkersLayer.hasLayer(marker)) {
   </div>
   `;
 
-  marker.unbindPopup();
-  marker.bindPopup(popupHtml, { 
+  point._marker.unbindPopup();
+  point._marker.bindPopup(popupHtml, { 
     maxWidth: 350,
     className: 'custom-leaflet-popup',
-    autoClose: false,
-    closeOnClick: false
+    closeOnClick: false,
+    keepInView: true
   });
-  marker.openPopup();
 
+  point._marker.openPopup();
 }
 map.on("popupclose", function () {
-  isPopupOpen = false;
-  applyFilters();
+  setTimeout(function () {
+    if (map._popup && map._popup.isOpen && map._popup.isOpen()) return;
+
+    isPopupOpen = false;
+
+    debounceRender(function () {
+      renderPlaces();
+      renderRoads();
+      applyFilters();
+      updateLabels();
+    }, 100);
+  }, 0);
 });
 
 map.on("popupopen", function () {
@@ -511,7 +544,7 @@ map.on("popupopen", function () {
 });
 
 // ---------------------------
-// اصلاح تابع فیلتر
+//  تابع فیلتر
 // ---------------------------
 function applyFilters() {
   visibleMarkersLayer.clearLayers();
@@ -539,128 +572,189 @@ function applyFilters() {
 
     const latlng = L.latLng(point.lat, point.lng);
 
-    if (isMobile && renderedCount >= maxMobileMarkers && !currentSearchQuery) {
-      break;
-    }
+    if (!bounds.contains(latlng) && !currentSearchQuery) continue;
+
 
     visibleMarkersLayer.addLayer(createPointMarker(point));
     renderedCount++;
   }
 }
 
-
-
 // ---------------------------
-// Search
+// Search (Full Improved Version)
 // ---------------------------
 const searchInput = document.getElementById("searchInput");
 const searchButton = document.getElementById("searchButton");
 const resultsBox = document.getElementById("searchResults");
 
-function performSearch(){
-
-    if(!searchInput) return;
-
-    const query = searchInput.value.trim().toLowerCase();
-
-    currentSearchQuery = query;
-
-    if(query.length < 2){
-
-        if(resultsBox) resultsBox.style.display="none";
-
-        applyFilters();
-
-        return;
-    }
-
-    const results = allPoints.filter(p => {
-
-        const text =
-        `${p.location || ""} ${p.city || ""} ${p.county || ""}`
-        .toLowerCase();
-
-        return text.includes(query);
-
-    });
-
-    showSearchResults(results.slice(0,10));
-
-    applyFilters();
-
+// نرمال‌سازی متن فارسی
+function normalizeSearchText(str) {
+  return (str || "")
+    .toString()
+    .replace(/\u200c/g, "")
+    .replace(/ي/g, "ی")
+    .replace(/ك/g, "ک")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
-
-function showSearchResults(list){
-
-    if(!resultsBox) return;
-
-    resultsBox.innerHTML="";
-
-    if(list.length===0){
-
-        resultsBox.style.display="none";
-
-        return;
-
-    }
-
-    list.forEach(point=>{
-
-        const div=document.createElement("div");
-
-        div.className="result-item";
-
-        div.textContent=
-        `${point.location || "-"} - ${point.city || point.county || ""}`;
-
-        div.onclick=()=>{
-
-            resultsBox.style.display="none";
-
-            map.setView([point.lat,point.lng],12,{animate:true});
-
-            setTimeout(()=>openPlacePopup(point),300);
-
-        };
-
-        resultsBox.appendChild(div);
-
-    });
-
-    resultsBox.style.display="block";
-
+// متن جستجوی هر نقطه
+function getPointSearchText(point) {
+  return normalizeSearchText(
+    `${point.location || ""} ${point.city || ""} ${point.county || ""} ${point.status || ""}`
+  );
 }
 
+// متن جستجوی شهر/مکان از GeoJSON
+function getPlaceSearchText(feature) {
+  return normalizeSearchText(feature?.properties?.name || "");
+}
+
+// پیدا کردن نتایج شهرها
+function findPlaceResults(query) {
+  if (!query || query.length < 2 || !geojsonPlaces.length) return [];
+
+  return geojsonPlaces
+    .filter(feature => {
+      const type = feature?.properties?.fclass;
+      const name = getPlaceSearchText(feature);
+
+      return ["city", "town"].includes(type) && name.includes(query);
+    })
+    .slice(0, 5);
+}
+
+// باز کردن نتیجه شهر
+function openCityResult(feature) {
+  resultsBox.style.display = "none";
+  if (searchInput) searchInput.blur();
+
+  const coords = feature.geometry?.coordinates;
+  if (!coords) return;
+
+  map.setView([coords[1], coords[0]], isMobile ? 12 : 11, {
+    animate: true
+  });
+}
+
+// باز کردن نتیجه نقطه یادمان
+function openPointResult(point) {
+  resultsBox.style.display = "none";
+  if (searchInput) searchInput.blur();
+
+  map.once("moveend", function () {
+    openPlacePopup(point);
+  });
+
+  map.setView([point.lat, point.lng], isMobile ? 13 : 12, {
+    animate: true
+  });
+}
 
 // اجرای جستجو
-if(searchButton)
-searchButton.addEventListener("click",performSearch);
+function performSearch() {
+  if (!searchInput) return;
 
-if(searchInput){
+  const rawQuery = searchInput.value.trim();
+  const query = normalizeSearchText(rawQuery);
 
-searchInput.addEventListener("input",performSearch);
+  currentSearchQuery = query;
 
-searchInput.addEventListener("keydown",function(e){
+  if (query.length < 2) {
+    resultsBox.style.display = "none";
+    applyFilters();
+    return;
+  }
 
-    if(e.key==="Enter") performSearch();
+  const cityResults = findPlaceResults(query);
 
-});
+  const pointResults = allPoints
+    .filter(point => getPointSearchText(point).includes(query))
+    .slice(0, isMobile ? 8 : 10);
 
+  showSearchResults(cityResults, pointResults);
+
+  applyFilters();
 }
 
+// نمایش نتایج
+function showSearchResults(cityList, pointList) {
+  if (!resultsBox) return;
 
-// بستن لیست نتایج
-document.addEventListener("click",function(e){
+  resultsBox.innerHTML = "";
 
-    if(!e.target.closest(".search-wrapper") && resultsBox){
+  if (cityList.length === 0 && pointList.length === 0) {
+    resultsBox.style.display = "none";
+    return;
+  }
 
-        resultsBox.style.display="none";
+  // نمایش شهرها اول
+  cityList.forEach(feature => {
+    const div = document.createElement("div");
+    div.className = "result-item result-city-item";
 
+    div.innerHTML = `
+      <div class="result-title">شهر ${feature.properties.name}</div>
+      <div class="result-meta">نمایش محدوده شهر روی نقشه</div>
+    `;
+
+    div.addEventListener("click", function () {
+      openCityResult(feature);
+    });
+
+    resultsBox.appendChild(div);
+  });
+
+  // سپس نقاط یادمان
+  pointList.forEach(point => {
+    const div = document.createElement("div");
+    div.className = "result-item";
+
+    div.innerHTML = `
+      <div class="result-title">${point.location || "-"}</div>
+      <div class="result-meta">
+        ${[point.city, point.county, point.status].filter(Boolean).join(" - ")}
+      </div>
+    `;
+
+    div.addEventListener("click", function () {
+      openPointResult(point);
+    });
+
+    resultsBox.appendChild(div);
+  });
+
+  resultsBox.style.display = "block";
+}
+
+// رویدادها
+if (searchButton)
+  searchButton.addEventListener("click", performSearch);
+
+if (searchInput) {
+
+  searchInput.addEventListener("input", function () {
+    debounceRender(performSearch, isMobile ? 220 : 120);
+  });
+
+  searchInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      performSearch();
+
+      const first = resultsBox.querySelector(".result-item");
+      if (first) first.click();
     }
+  });
+}
 
+// بستن لیست هنگام کلیک بیرون
+document.addEventListener("click", function (e) {
+  if (!e.target.closest(".search-wrapper") && resultsBox) {
+    resultsBox.style.display = "none";
+  }
 });
-
 
 // ---------------------------
 // Status Filter

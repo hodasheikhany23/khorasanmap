@@ -679,3 +679,17 @@ body.sidebar-open .header-content {
         cursor: pointer;
     }
 }
+.result-city-item {
+  background: #eff6ff;
+  border-bottom: 1px solid #bfdbfe;
+}
+
+.result-city-item .result-title {
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.result-city-item .result-meta {
+  color: #2563eb;
+  font-size: 12px;
+}
