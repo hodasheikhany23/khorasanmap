@@ -1,16 +1,12 @@
-const isMobile = window.innerWidth <= 768;
 
 var map = L.map('map', { 
-  zoomControl: true,
-  minZoom: 6,
-  maxZoom: 15,
-  preferCanvas: true,
-  zoomAnimation: !isMobile,
-  markerZoomAnimation: !isMobile,
-  fadeAnimation: !isMobile
+    zoomControl: true,
+    minZoom: 6,
+    maxZoom: 15
 }).setView([36.2972, 59.6068], 7);
-
+const isMobile = window.innerWidth <= 768;
 const visibleMarkersLayer = L.layerGroup().addTo(map);
+const cityClusterLayer = L.layerGroup().addTo(map);
 
 let renderTimer = null;
 let isPopupOpen = false;
@@ -97,6 +93,65 @@ function normalizePoint(p) {
     }
   };
 }
+function groupPointsByCity(points) {
+  const groups = new Map();
+
+  points.forEach(point => {
+    const city = (point.city || point.county || "نامشخص").trim();
+
+    if (!groups.has(city)) {
+      groups.set(city, []);
+    }
+
+    groups.get(city).push(point);
+  });
+
+  return groups;
+}
+function createCityClusterMarker(cityName, points) {
+
+  const count = points.length;
+
+  const avgLat = points.reduce((s, p) => s + p.lat, 0) / count;
+  const avgLng = points.reduce((s, p) => s + p.lng, 0) / count;
+
+  // اگر وضعیت‌ها متفاوت باشند، می‌توانی حالت پیش‌فرض بدهی
+  // اینجا وضعیت اولین نقطه را برای رنگ مارکر استفاده می‌کنیم
+  const mainPoint = points[0];
+  const statusClass = getStatusClass(mainPoint.status);
+
+  const icon = L.divIcon({
+    className: "custom-marker city-cluster-marker-icon",
+    html: `
+      <div class="marker-container city-cluster-marker">
+        <div class="pin-shadow"></div>
+        <div class="marker-pin ${statusClass}"></div>
+        <div class="pin-glow"></div>
+
+        <div class="city-cluster-badge">
+          ${count}
+        </div>
+      </div>
+    `,
+    iconSize: [40, 46],
+    iconAnchor: [16, 42],
+    popupAnchor: [0, -40]
+  });
+
+  const marker = L.marker([avgLat, avgLng], {
+    icon,
+    zIndexOffset: 1200
+  });
+
+  marker.on("click", function () {
+    map.setView([avgLat, avgLng], Math.max(map.getZoom() + 2, 11), {
+      animate: true
+    });
+  });
+
+  return marker;
+}
+
 
 // ---------------------------
 // Base Layers (GeoJSON)
@@ -136,20 +191,8 @@ function roadFilter(feature) {
 function renderRoads() {
   if (typeof roadData === 'undefined') return;
 
-  const zoom = map.getZoom();
-
-  if (isMobile && zoom < 10) {
-    if (roadsLayer) {
-      map.removeLayer(roadsLayer);
-      roadsLayer = null;
-    }
-    roadLabels.clearLayers();
-    return;
-  }
-
   if (roadsLayer) {
     map.removeLayer(roadsLayer);
-    roadsLayer = null;
   }
 
   roadNamesShown.clear();
@@ -159,35 +202,35 @@ function renderRoads() {
     filter: roadFilter,
     style: {
       color: "#64748b",
-      weight: isMobile ? 0.7 : 1.2,
-      opacity: isMobile ? 0.55 : 0.9
+      weight: isMobile ? 0.8 : 1.2,
+      opacity: isMobile ? 0.65 : 0.9
     },
     onEachFeature: function (feature, layer) {
       if (isMobile) return;
 
-      const roadName = feature.properties.name;
-      if (!roadName || roadName.includes('?') || roadNamesShown.has(roadName)) return;
+      let roadName = feature.properties.name;
 
-      roadNamesShown.add(roadName);
+      if (roadName && !roadName.includes('?') && !roadNamesShown.has(roadName)) {
+        roadNamesShown.add(roadName);
 
-      if (layer.getBounds && layer.getBounds().isValid()) {
-        const center = layer.getBounds().getCenter();
+        if (layer.getBounds && layer.getBounds().isValid()) {
+          var center = layer.getBounds().getCenter();
 
-        roadLabels.addLayer(
-          L.tooltip({
+          var label = L.tooltip({
             permanent: true,
             direction: 'center',
             className: 'road-label',
             opacity: 0.8
           })
           .setLatLng(center)
-          .setContent(`<span style="font-family: Tahoma; direction: rtl;">${roadName}</span>`)
-        );
+          .setContent(`<span style="font-family: Tahoma; direction: rtl;">${roadName}</span>`);
+
+          roadLabels.addLayer(label);
+        }
       }
     }
   }).addTo(map);
 }
-
 
 renderRoads();
 
@@ -223,40 +266,38 @@ function renderPlaces() {
 
   geojsonPlaces = placesData.features;
 
-  const bounds = map.getBounds().pad(isMobile ? 0.05 : 0.2);
-  const zoom = map.getZoom();
+  const bounds = map.getBounds().pad(0.3);
 
-  for (const feature of geojsonPlaces) {
-    if (!shouldShowPlace(feature)) continue;
+  geojsonPlaces.forEach(feature => {
+    if (!shouldShowPlace(feature)) return;
 
     const coords = feature.geometry && feature.geometry.coordinates;
-    if (!coords) continue;
+    if (!coords) return;
 
     const latlng = L.latLng(coords[1], coords[0]);
 
-    if (!bounds.contains(latlng)) continue;
+    if (!bounds.contains(latlng)) return;
 
-    const fclass = feature.properties.fclass;
-    const name = feature.properties.name || "";
+    const label = L.divIcon({
+      className: 'place-label',
+      html: `<div>${feature.properties.name || ""}</div>`,
+      iconSize: [100, 20],
+      iconAnchor: [50, 10]
+    });
 
     const marker = L.marker(latlng, {
-      icon: L.divIcon({
-        className: 'place-label',
-        html: `<div>${name}</div>`,
-        iconSize: [100, 20],
-        iconAnchor: [50, 10]
-      }),
+      icon: label,
       interactive: false,
       zIndexOffset: -1000
     });
 
+    const fclass = feature.properties.fclass;
+
     if (fclass === 'city') marker.addTo(cityLayer);
     else if (fclass === 'town') marker.addTo(townLayer);
     else if (['village', 'hamlet'].includes(fclass)) marker.addTo(villageLayer);
-  }
+  });
 }
-
-
 
 renderPlaces();
 
@@ -338,12 +379,15 @@ function updateLabels() {
   else map.removeLayer(roadLabels);
 }
 
+
 map.on("moveend", function () {
   debounceRender(function () {
     if (isPopupOpen) return;
 
+    renderPlaces();
     applyFilters();
-  }, isMobile ? 350 : 150);
+    updateLabels();
+  }, 180);
 });
 
 map.on("zoomend", function () {
@@ -354,39 +398,21 @@ map.on("zoomend", function () {
     renderPlaces();
     applyFilters();
     updateLabels();
-  }, isMobile ? 450 : 180);
+  }, 180);
 });
 
 
 function normalizeFaText(str) {
   return (str || "")
     .toString()
-    .normalize("NFKC")
-    .replace(/_/g, " ")              // خیلی مهم: آندرلاین به فاصله
-    .replace(/[،,]/g, " ")
-    .replace(/\u200c/g, " ")         // نیم‌فاصله به فاصله
+    .replace(/[،,]/g, " ") 
+    .replace(/\u200c/g, "")
     .replace(/ي/g, "ی")
     .replace(/ك/g, "ک")
-    .replace(/[إأآا]/g, "ا")         // آزاد / ازاد یکی شود
-    .replace(/[ًٌٍَُِّْ]/g, "")
-    .replace(/\.[a-zA-Z0-9]+$/g, " ") // حذف پسوند فایل مثل jpg
-    .replace(/[^آ-یa-zA-Z0-9\s]/g, " ")
+    .replace(/[^آ-یa-zA-Z0-9\s]/g, "") 
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
-}
-
-function getWords(str) {
-  return normalizeFaText(str)
-    .split(" ")
-    .filter(Boolean)
-    .filter(word => word.length > 1)
-    // حذف عددهای تنها مثل 049
-    .filter(word => !/^\d+$/.test(word));
-}
-
-function getFileNameFromPath(path) {
-  return String(path || "").split("/").pop() || "";
 }
 
 function findFolder(point) {
@@ -394,77 +420,45 @@ function findFolder(point) {
 
   const pointCity = normalizeFaText(point.city || "");
   const pointLoc = normalizeFaText(point.location || "");
-  const pointFull = `${pointCity} ${pointLoc}`.trim();
-
-  const pointWords = getWords(pointFull);
-
-  console.log("🔍 findFolder target:", {
-    city: point.city,
-    location: point.location,
-    normalized: pointFull,
-    words: pointWords
-  });
+  const pointFull = `${pointCity} ${pointLoc}`;
 
   const folderKeys = Object.keys(folderImagesMap);
-
   let bestMatch = null;
   let highestScore = 0;
-  let bestDebug = null;
 
   folderKeys.forEach(folder => {
-    const images = folderImagesMap[folder] || [];
+    const normFolder = normalizeFaText(folder);
+    
+    // کلمات کلیدی پوشه و نقطه را استخراج کن
+    const folderWords = normFolder.split(" ");
+    const pointWords = pointFull.split(" ");
 
-    // متن قابل جستجو = نام پوشه + نام فایل‌های داخلش
-    const fileNamesText = images
-      .map(path => getFileNameFromPath(path))
-      .join(" ");
-
-    const searchableText = `${folder} ${fileNamesText}`;
-    const searchableWords = getWords(searchableText);
-
+    // محاسبه امتیاز شباهت (چند کلمه مشترک دارند؟)
     let matches = 0;
-    const matchedWords = [];
-
     pointWords.forEach(word => {
-      if (searchableWords.includes(word)) {
+      if (word.length > 2 && folderWords.includes(word)) {
         matches++;
-        matchedWords.push(word);
       }
     });
 
-    const score = pointWords.length
-      ? matches / pointWords.length
-      : 0;
+    // امتیاز نهایی بر اساس نسبت کلمات مشترک
+    const score = matches / Math.max(pointWords.length, 1);
 
     if (score > highestScore) {
       highestScore = score;
       bestMatch = folder;
-      bestDebug = {
-        folder,
-        searchableWords,
-        matchedWords,
-        score
-      };
     }
   });
 
-  // آستانه 0.5 برای مواردی که نام فایل هم کمک می‌کند مناسب است
+  // اگر حداقل 50 درصد کلمات (به جز نام شهر که ممکن است غلط باشد) تطابق داشت، قبول کن
   if (bestMatch && highestScore >= 0.5) {
-    console.log(
-      `✅ Folder found! Score: ${highestScore.toFixed(2)} | Key: ${bestMatch}`,
-      bestDebug
-    );
+    console.log(`✅ Folder found! Score: ${highestScore.toFixed(2)} | Key: ${bestMatch}`);
     return bestMatch;
   }
 
-  console.warn(
-    `❌ No match found. Best guess was: ${bestMatch} (Score: ${highestScore.toFixed(2)})`,
-    bestDebug
-  );
-
+  console.warn(`❌ No match found. Best guess was: ${bestMatch} (Score: ${highestScore.toFixed(2)})`);
   return null;
 }
-
 
 
 
@@ -647,14 +641,17 @@ map.on("popupopen", function () {
 //  تابع فیلتر
 // ---------------------------
 function applyFilters() {
+
   visibleMarkersLayer.clearLayers();
+  cityClusterLayer.clearLayers();
 
   const bounds = map.getBounds().pad(0.2);
   const zoom = map.getZoom();
 
-  let renderedCount = 0;
+  const filteredPoints = [];
 
   for (const point of allPoints) {
+
     const searchString =
       `${point.location || ""} ${point.city || ""} ${point.county || ""}`
       .toLowerCase();
@@ -671,12 +668,54 @@ function applyFilters() {
 
     const latlng = L.latLng(point.lat, point.lng);
 
-    if (!bounds.contains(latlng) && !currentSearchQuery) continue;
+    if (!currentSearchQuery && !bounds.contains(latlng)) continue;
 
-
-    visibleMarkersLayer.addLayer(createPointMarker(point));
-    renderedCount++;
+    filteredPoints.push(point);
   }
+
+
+  // -------------------------
+  // زوم کم → کلاستر شهری
+  // -------------------------
+
+  if(!currentSearchQuery && zoom < 10){
+
+    const cityGroups = groupPointsByCity(filteredPoints);
+
+    cityGroups.forEach((points,city)=>{
+
+      if(points.length === 1){
+
+        visibleMarkersLayer.addLayer(
+          createPointMarker(points[0])
+        );
+
+      }else{
+
+        cityClusterLayer.addLayer(
+          createCityClusterMarker(city,points)
+        );
+
+      }
+
+    });
+
+    return;
+  }
+
+
+  // -------------------------
+  // زوم بالا → مارکر واقعی
+  // -------------------------
+
+  for(const point of filteredPoints){
+
+    visibleMarkersLayer.addLayer(
+      createPointMarker(point)
+    );
+
+  }
+
 }
 
 // ---------------------------

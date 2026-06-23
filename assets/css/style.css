@@ -693,3 +693,36 @@ body.sidebar-open .header-content {
   color: #2f855a;
   font-size: 12px;
 }
+.city-cluster-marker-icon {
+  background: transparent;
+  border: none;
+}
+
+.city-cluster-marker {
+  position: relative;
+}
+
+.city-cluster-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+
+  border-radius: 999px;
+  background: #c5ccd9;
+  color: #31364b;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  
+  z-index: 10;
+  pointer-events: none;
+}
