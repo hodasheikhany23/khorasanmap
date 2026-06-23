@@ -4,6 +4,15 @@ var map = L.map('map', {
     minZoom: 6,
     maxZoom: 15
 }).setView([36.2972, 59.6068], 7);
+const isMobile = window.innerWidth <= 768;
+const visibleMarkersLayer = L.layerGroup().addTo(map);
+
+let renderTimer = null;
+
+function debounceRender(fn, delay = 150) {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(fn, delay);
+}
 
 document.getElementById('map').style.background = '#f1f5f9';
 // لایه‌های برچسب شهر و روستا
@@ -17,7 +26,7 @@ var roadNamesShown = new Set();
 var geojsonPlaces = [];
 
 var allPoints = [];
-var markersLayer = []; 
+var markersLayer = L.layerGroup().addTo(map);
 
 
 // ---------------------------
@@ -97,86 +106,180 @@ if (typeof adminareaData !== 'undefined') {
 
 // ---------------------------
 // 2. بارگذاری جاده‌ها (از متغیر محلی)
-// ---------------------------
-if (typeof roadData !== 'undefined') {
-    L.geoJSON(roadData, {
-        filter: f => ["motorway", "trunk", "primary"].includes(f.properties.fclass),
-        style: { color: "#64748b", weight: 1.2, opacity: 0.9 },
-        onEachFeature: function (feature, layer) {
-            let roadName = feature.properties.name;
-            if (roadName && !roadName.includes('?') && !roadNamesShown.has(roadName)) {
-                roadNamesShown.add(roadName);
-                if (layer.getBounds && layer.getBounds().isValid()) {
-                    var center = layer.getBounds().getCenter();
-                    var label = L.tooltip({
-                        permanent: true, direction: 'center',
-                        className: 'road-label', opacity: 0.8
-                    })
-                    .setLatLng(center)
-                    .setContent(`<span style="font-family: Tahoma; direction: rtl;">${roadName}</span>`);
-                    roadLabels.addLayer(label);
-                }
-            }
-        }
-    }).addTo(map);
+var roadsLayer = null;
+
+function roadFilter(feature) {
+  const type = feature.properties.fclass;
+  const zoom = map.getZoom();
+
+  if (isMobile) {
+    if (zoom < 9) {
+      return ["motorway", "trunk", "primary"].includes(type);
+    }
+
+    if (zoom < 12) {
+      return ["motorway", "trunk", "primary", "secondary"].includes(type);
+    }
+
+    return ["motorway", "trunk", "primary", "secondary", "tertiary"].includes(type);
+  }
+
+  return ["motorway", "trunk", "primary", "secondary", "tertiary"].includes(type);
 }
+
+function renderRoads() {
+  if (typeof roadData === 'undefined') return;
+
+  if (roadsLayer) {
+    map.removeLayer(roadsLayer);
+  }
+
+  roadNamesShown.clear();
+  roadLabels.clearLayers();
+
+  roadsLayer = L.geoJSON(roadData, {
+    filter: roadFilter,
+    style: {
+      color: "#64748b",
+      weight: isMobile ? 0.8 : 1.2,
+      opacity: isMobile ? 0.65 : 0.9
+    },
+    onEachFeature: function (feature, layer) {
+      if (isMobile) return;
+
+      let roadName = feature.properties.name;
+
+      if (roadName && !roadName.includes('?') && !roadNamesShown.has(roadName)) {
+        roadNamesShown.add(roadName);
+
+        if (layer.getBounds && layer.getBounds().isValid()) {
+          var center = layer.getBounds().getCenter();
+
+          var label = L.tooltip({
+            permanent: true,
+            direction: 'center',
+            className: 'road-label',
+            opacity: 0.8
+          })
+          .setLatLng(center)
+          .setContent(`<span style="font-family: Tahoma; direction: rtl;">${roadName}</span>`);
+
+          roadLabels.addLayer(label);
+        }
+      }
+    }
+  }).addTo(map);
+}
+
+renderRoads();
+
 
 // ---------------------------
 // 3. بارگذاری نام شهرها و مکان‌ها
 // ---------------------------
-if (typeof placesData !== 'undefined') {
-    geojsonPlaces = placesData.features;
-    L.geoJSON(placesData, {
-        pointToLayer: function (feature, latlng) {
-            var label = L.divIcon({
-                className: 'place-label',
-                html: `<div>${feature.properties.name}</div>`,
-                iconSize: [100, 20], iconAnchor: [50, 10]
-            });
-            var marker = L.marker(latlng, { 
-                icon: label, 
-                interactive: false, 
-                zIndexOffset: -1000 
-            });
-            
-            const fclass = feature.properties.fclass;
-            if (fclass === 'city') marker.addTo(cityLayer);
-            else if (fclass === 'town') marker.addTo(townLayer);
-            else if (['village', 'hamlet'].includes(fclass)) marker.addTo(villageLayer);
-            return null;
-        }
-    });
+function shouldShowPlace(feature) {
+  const type = feature.properties.fclass;
+  const zoom = map.getZoom();
+
+  if (isMobile) {
+    if (zoom < 8) return type === "city";
+    if (zoom < 10) return ["city", "town"].includes(type);
+    if (zoom < 13) return ["city", "town", "village"].includes(type);
+
+    return ["city", "town", "village"].includes(type);
+  }
+
+  if (zoom < 8) return type === "city";
+  if (zoom < 10) return ["city", "town"].includes(type);
+  if (zoom < 12) return ["city", "town", "village"].includes(type);
+
+  return ["city", "town", "village", "hamlet"].includes(type);
 }
+
+function renderPlaces() {
+  cityLayer.clearLayers();
+  townLayer.clearLayers();
+  villageLayer.clearLayers();
+
+  if (typeof placesData === 'undefined') return;
+
+  geojsonPlaces = placesData.features;
+
+  const bounds = map.getBounds().pad(0.3);
+
+  geojsonPlaces.forEach(feature => {
+    if (!shouldShowPlace(feature)) return;
+
+    const coords = feature.geometry && feature.geometry.coordinates;
+    if (!coords) return;
+
+    const latlng = L.latLng(coords[1], coords[0]);
+
+    if (!bounds.contains(latlng)) return;
+
+    const label = L.divIcon({
+      className: 'place-label',
+      html: `<div>${feature.properties.name || ""}</div>`,
+      iconSize: [100, 20],
+      iconAnchor: [50, 10]
+    });
+
+    const marker = L.marker(latlng, {
+      icon: label,
+      interactive: false,
+      zIndexOffset: -1000
+    });
+
+    const fclass = feature.properties.fclass;
+
+    if (fclass === 'city') marker.addTo(cityLayer);
+    else if (fclass === 'town') marker.addTo(townLayer);
+    else if (['village', 'hamlet'].includes(fclass)) marker.addTo(villageLayer);
+  });
+}
+
+renderPlaces();
+
 
 // ---------------------------
 // 4. بارگذاری نقاط یادمان (نقاط اصلی پروژه)
 // ---------------------------
 if (typeof pointsData !== 'undefined') {
     allPoints = (pointsData || []).map(normalizePoint).filter(Boolean);
-    allPoints.forEach(point => {
-        const statusClass = getStatusClass(point.status);
-        const myIcon = L.divIcon({
-            html: `<div class="marker-container">
-                     <div class="pin-shadow"></div>
-                     <div class="marker-pin ${statusClass}"></div>
-                     <div class="pin-glow"></div>
-                   </div>`,
-            className: 'custom-marker',
-            iconSize: [32, 42], iconAnchor: [16, 42], popupAnchor: [0, -40]
-        });
-
-        point._marker = L.marker([point.lat, point.lng], { 
-            icon: myIcon,
-            zIndexOffset: 1000 
-        }); 
-
-        point._marker.on('click', () => openPlacePopup(point));
-    });
 }
 
 // در نهایت اجرای فیلترها و لیبل‌ها
+renderPlaces();
+renderRoads();
 applyFilters();
 updateLabels();
+
+function createPointMarker(point) {
+  if (point._marker) return point._marker;
+
+  const statusClass = getStatusClass(point.status);
+
+  const myIcon = L.divIcon({
+    html: `<div class="marker-container">
+             <div class="pin-shadow"></div>
+             <div class="marker-pin ${statusClass}"></div>
+             <div class="pin-glow"></div>
+           </div>`,
+    className: 'custom-marker',
+    iconSize: [32, 42],
+    iconAnchor: [16, 42],
+    popupAnchor: [0, -40]
+  });
+
+  point._marker = L.marker([point.lat, point.lng], {
+    icon: myIcon,
+    zIndexOffset: 1000
+  });
+
+  point._marker.on('click', () => openPlacePopup(point));
+
+  return point._marker;
+}
 
 
 // ---------------------------
@@ -184,13 +287,31 @@ updateLabels();
 // ---------------------------
 function updateLabels() {
   var z = map.getZoom();
-  if (z >= 9) { map.addLayer(townLayer); } else { map.removeLayer(townLayer); }
-  if (z >= 12) { map.addLayer(villageLayer); } else { map.removeLayer(villageLayer); }
-  
-  if (z >= 14) { map.addLayer(roadLabels); } else { map.removeLayer(roadLabels); }
+
+  if (!map.hasLayer(cityLayer)) {
+    map.addLayer(cityLayer);
+  }
+
+  if (z >= 9) map.addLayer(townLayer);
+  else map.removeLayer(townLayer);
+
+  if (z >= 12) map.addLayer(villageLayer);
+  else map.removeLayer(villageLayer);
+
+  if (!isMobile && z >= 14) map.addLayer(roadLabels);
+  else map.removeLayer(roadLabels);
 }
 
+
 map.on("zoomend", updateLabels);
+map.on("moveend zoomend", function () {
+  debounceRender(function () {
+    renderPlaces();
+    renderRoads();
+    applyFilters();
+    updateLabels();
+  }, 180);
+});
 
 function normalizeFaText(str) {
   return (str || "")
@@ -216,8 +337,6 @@ function findFolder(point) {
     return normalizedFolder.includes(city) && 
            (normalizedFolder.includes(location) || location.includes(normalizedFolder.split('_')[2]));
   });
-
-  console.log(`Searching for: ${city} - ${location} | Found: ${folderKey}`);
 
   return folderKey || null;
 }
@@ -265,10 +384,6 @@ function openPlacePopup(point) {
   const images = folder ? folderImagesMap[folder] : [];
 
   const sliderHtml = images.length > 0 ? buildImageSlider(images) : "";
-console.log("folder =", folder);
-console.log("images =", images);
-console.log("map exists =", typeof folderImagesMap !== "undefined");
-console.log("keys sample =", typeof folderImagesMap !== "undefined" ? Object.keys(folderImagesMap).slice(0, 10) : "no map");
 
  // تعریف آیکون‌ها با استفاده از SVG Path
   const icons = {
@@ -385,37 +500,46 @@ map.on("popupopen", function () {
 // اصلاح تابع فیلتر
 // ---------------------------
 function applyFilters() {
+  visibleMarkersLayer.clearLayers();
 
-    allPoints.forEach(point => {
+  const bounds = map.getBounds().pad(0.2);
+  const zoom = map.getZoom();
 
-        const searchString =
-          `${point.location || ""} ${point.city || ""} ${point.county || ""}`
-          .toLowerCase();
+  let renderedCount = 0;
+  const maxMobileMarkers = 250;
 
-        const matchesSearch =
-          !currentSearchQuery ||
-          searchString.includes(currentSearchQuery);
+  for (const point of allPoints) {
+    const searchString =
+      `${point.location || ""} ${point.city || ""} ${point.county || ""}`
+      .toLowerCase();
 
-        const matchesStatus =
-        currentStatusFilter === "all" ||
-        (point.status && point.status.trim() === currentStatusFilter);
+    const matchesSearch =
+      !currentSearchQuery ||
+      searchString.includes(currentSearchQuery);
 
+    const matchesStatus =
+      currentStatusFilter === "all" ||
+      (point.status && point.status.trim() === currentStatusFilter);
 
-        if (matchesSearch && matchesStatus) {
+    if (!matchesSearch || !matchesStatus) continue;
 
-            if (!map.hasLayer(point._marker))
-                point._marker.addTo(map);
+    const latlng = L.latLng(point.lat, point.lng);
 
-        } else {
+    if (!bounds.contains(latlng) && !currentSearchQuery) continue;
 
-            if (map.hasLayer(point._marker))
-                map.removeLayer(point._marker);
+    if (isMobile && !currentSearchQuery && zoom < 9) {
+      continue;
+    }
 
-        }
+    if (isMobile && renderedCount >= maxMobileMarkers && !currentSearchQuery) {
+      break;
+    }
 
-    });
-
+    visibleMarkersLayer.addLayer(createPointMarker(point));
+    renderedCount++;
+  }
 }
+
 
 
 // ---------------------------
